@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <sys/signalfd.h>
 #include <sys/signal.h>
+#include <dlfcn.h>
 #endif
 #include <ctime>
 #include <algorithm>
@@ -51,19 +52,34 @@ Server::~Server()
 	Stoppen();
 }
 
-void Server::Starten(const int port, const int sslport)
+bool CreateServerSocket(uintptr_t &serverSocket, int port)
 {
-	std::string certroot =
-#ifdef _WIN32
-		"./"
-#else
-		"/etc/letsencrypt/live/p4fdf5699.dip0.t-ipconnect.de/"
-#endif
-		;
-	std::string publicchain = certroot + "fullchain.pem";
-	std::string privatekey = certroot + "privkey.pem";
-	serverSocket = -1;
-	sslServerSocket = -1;
+	serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+	if(serverSocket == -1)
+	{
+		std::cerr << "Kann den Socket nicht erstellen!";
+		return false;
+	}
+	sockaddr_in serverAdresse;
+	serverAdresse.sin_family = AF_INET;
+	serverAdresse.sin_addr.s_addr = INADDR_ANY;
+	serverAdresse.sin_port = htons(port);
+
+	if (bind(serverSocket, (sockaddr *)&serverAdresse, sizeof(serverAdresse)) == -1)
+	{
+		std::cerr << "Kann den Socket nicht Binden!\n";
+		return false;
+	}
+	if (listen(serverSocket, 10) == -1)
+	{
+		std::cerr << "Kann den Socket nicht Abhören!\n";
+		return false;
+	}
+	return true;
+}
+
+void Server::Starten(const int httpPort, const int httpsPort)
+{
 	if (servermainstop.load())
 		return;
 #ifdef _WIN32
@@ -72,69 +88,49 @@ void Server::Starten(const int port, const int sslport)
 #endif
 	SSL_CTX* ctx = nullptr;
 
-	if(sslport > 0)
+	fs::path certroot =
+#ifdef _WIN32
+		"./"
+#else
+		"/etc/letsencrypt/live/p4fdf5699.dip0.t-ipconnect.de/"
+#endif
+		;
+	fs::path publicchain = certroot / "fullchain.pem";
+	fs::path privatekey = certroot / "privkey.pem";
+
+	serverSocket = -1;
+	sslServerSocket = -1;
+
+	if (fs::is_regular_file(publicchain) && fs::is_regular_file(privatekey))
 	{
-		if (fs::is_regular_file(publicchain) && fs::is_regular_file(privatekey))
-		{
-			SSL_load_error_strings();
-			OpenSSL_add_ssl_algorithms();
+		SSL_load_error_strings();
+		OpenSSL_add_ssl_algorithms();
 
-			ctx = SSL_CTX_new(TLS_server_method());
+		ctx = SSL_CTX_new(TLS_server_method());
 
-			if (SSL_CTX_use_certificate_chain_file((SSL_CTX*)ctx, publicchain.data()) < 0) {
-				ERR_print_errors_fp(stderr);
-				exit(EXIT_FAILURE);
-			}
-
-			if (SSL_CTX_use_PrivateKey_file((SSL_CTX*)ctx, privatekey.data(), SSL_FILETYPE_PEM) < 0) {
-				ERR_print_errors_fp(stderr);
-				exit(EXIT_FAILURE);
-			}
-
-			sslServerSocket = socket(AF_INET, SOCK_STREAM, 0);
-			if(sslServerSocket == -1)
-			{
-				std::cout << "Kann den SSL Socket nicht erstellen!";
-			}
-			sockaddr_in secserverAdresse;
-			secserverAdresse.sin_family = AF_INET;
-			secserverAdresse.sin_addr.s_addr = INADDR_ANY;
-			secserverAdresse.sin_port = htons(sslport);
-			if (bind(sslServerSocket, (sockaddr *)&secserverAdresse, sizeof(secserverAdresse)) == -1)
-			{
-				std::cerr << "Kann den SSL Socket nicht Binden!";
-			}
-			if (listen(sslServerSocket, 10) == -1)
-			{
-				std::cerr << "Kann den SSL Socket nicht Abhören!";
-			}
+		if (SSL_CTX_use_certificate_chain_file((SSL_CTX*)ctx, publicchain.c_str()) < 0) {
+			ERR_print_errors_fp(stderr);
+			return;
 		}
-		else
+
+		if (SSL_CTX_use_PrivateKey_file((SSL_CTX*)ctx, privatekey.c_str(), SSL_FILETYPE_PEM) < 0) {
+			ERR_print_errors_fp(stderr);
+			return;
+		}
+		if(!CreateServerSocket(sslServerSocket, httpsPort > 0 ? httpsPort : 433))
 		{
-			std::cerr << "Achtung Zertifikat(e) nicht gefunden!\n";
+			return;
 		}
 	}
-
-	if(port > 0)
+	else
 	{
-		serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-		if(serverSocket == -1)
-		{
-			std::cerr << "Kann den Socket nicht erstellen!";
-		}
-		sockaddr_in serverAdresse;
-		serverAdresse.sin_family = AF_INET;
-		serverAdresse.sin_addr.s_addr = INADDR_ANY;
-		serverAdresse.sin_port = htons(port);
+		std::cerr << "Zertifikat(e) nicht gefunden\n";
+		return;
+	}
 
-		if (bind(serverSocket, (sockaddr *)&serverAdresse, sizeof(serverAdresse)) == -1)
-		{
-			std::cerr << "Kann den Socket nicht Binden!\n";
-		}
-		if (listen(serverSocket, 10) == -1)
-		{
-			std::cerr << "Kann den Socket nicht Abhören!\n";
-		}
+	if(!CreateServerSocket(serverSocket, httpPort > 0 ? httpPort : 80))
+	{
+		return;
 	}
 	servermainstop.store(true);
 	servermain = (void*)new std::thread([this, ctx]() {
