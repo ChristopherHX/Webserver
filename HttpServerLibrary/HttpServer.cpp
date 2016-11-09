@@ -32,6 +32,7 @@
 #include <sstream>
 #include <iostream>
 #include <cstdio>
+#include <list>
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -225,6 +226,18 @@ struct FileUploadArgs
 	fs::path serverPath;
 };
 
+bool compare_nocase (const std::string& first, const std::string& second)
+{
+  unsigned int i=0;
+  while ( (i<first.length()) && (i<second.length()) )
+  {
+    if (tolower(first[i])<tolower(second[i])) return true;
+    else if (tolower(first[i])>tolower(second[i])) return false;
+    ++i;
+  }
+  return ( first.length() < second.length() );
+}
+
 void Server::processRequest(std::unique_ptr<RecvBuffer> buffer)
 {
 	using namespace std::chrono_literals;
@@ -279,9 +292,8 @@ void Server::processRequest(std::unique_ptr<RecvBuffer> buffer)
 								fs::path folderPath = rootfolder / serverPath;
 								if(fs::is_directory(folderPath))
 								{
-									std::stringstream contentstream;
-									contentstream << "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><link rel=\"stylesheet\" href=\"/folder.css\" type=\"text/css\"/></head><body><div id=\"path\">" << serverPath << "</div>";
-									if(serverPath != "/") contentstream << "<div><a class=\"button button3\" href=\"/folderview.html?folder=" << serverPath.substr(0, serverPath.find_last_of('/', serverPath.length() - 2)) << "/\" target=\"_self\">..</button></div>";
+									std::list<std::string> folder;
+									std::list<std::string> files;
 									for (fs::directory_entry entry : fs::directory_iterator(folderPath))
 									{
 										std::string name(entry.path().filename().string());
@@ -289,14 +301,27 @@ void Server::processRequest(std::unique_ptr<RecvBuffer> buffer)
 										switch (status.type())
 										{
 										case fs::file_type::regular:
-											contentstream << "<div><a class=\"button button1\" href=\"" << serverPath << name << "\" target=\"_top\">" << name << "</a><a class=\"button button2\" href=\"" << serverPath << name << "?download\"></a></div>";
+											files.push_back(name);
 											break;
 										case fs::file_type::directory:
-											contentstream << "<div><a class=\"button button3\" href=\"/folderview.html?folder=" << serverPath << name << "/\" target=\"_self\">" << name << "</button></div>";
+											folder.push_back(name);
 											break;
 										default:
 											break;
 										}
+									}
+									std::stringstream contentstream;
+									contentstream << "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><link rel=\"stylesheet\" href=\"/folder.css\" type=\"text/css\"/></head><body><div id=\"path\">" << serverPath << "</div>";
+									if(serverPath != "/") contentstream << "<div><a class=\"button button3\" href=\"/folderview.html?folder=" << serverPath.substr(0, serverPath.find_last_of('/', serverPath.length() - 2)) << "/\" target=\"_self\">..</button></div>";
+									folder.sort(compare_nocase);
+									for(auto &name : folder)
+									{
+										contentstream << "<div><a class=\"button button3\" href=\"/folderview.html?folder=" << serverPath << name << "/\" target=\"_self\">" << name << "</button></div>";
+									}
+									files.sort(compare_nocase);
+									for(auto &name : files)
+									{
+										contentstream << "<div><a class=\"button button1\" href=\"" << serverPath << name << "\" target=\"_top\">" << name << "</a><a class=\"button button2\" href=\"" << serverPath << name << "?download\"></a></div>";										
 									}
 									contentstream << "</body>";
 									std::string content(contentstream.str());
@@ -340,7 +365,7 @@ void Server::processRequest(std::unique_ptr<RecvBuffer> buffer)
 								fs::path filepath = rootfolder / requestHeader.requestPath;
 								if(!is_regular_file(filepath))
 								{
-									throw ServerException("File or Folder not exists");								
+									throw ServerException("File not exists");								
 								}
 								time_t date = fs::file_time_type::clock::to_time_t(fs::last_write_time(filepath));
 								strftime(buf.Data(), buf.Length(), "%a, %d-%b-%G %H:%M:%S GMT", std::gmtime(&date));
