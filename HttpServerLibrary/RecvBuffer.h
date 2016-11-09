@@ -19,24 +19,24 @@ namespace HttpServer
 		const int blocksize;
 		int readpos, writepos;
 		bool recvstate;
-		std::string ip;
+		std::string client;
 		void * ssl;
 	public:
 		RecvBuffer(RecvBuffer&&);
 		RecvBuffer(RecvBuffer&) = delete;
-		RecvBuffer(uintptr_t socket, const int capacity, const std::string ip, void * ssl);
+		RecvBuffer(uintptr_t socket, const int capacity, const std::string client, void * ssl);
 		~RecvBuffer();
 		bool isSecure();
 		void RecvData(std::function<int(RecvBuffer*, DualByteArray)> callback);
-		void StopRecvData();
 		bool RecvDataState();
+		void RecvDataState(bool recvstate);
 		int Send(const std::string &str);
 		int Send(std::istream &stream, int offset, int length);
 		int GetCapacity();
 		int CopyTo(std::ostream &stream, int length);
-		const std::string &GetIP()
+		const std::string &Client()
 		{
-			return ip;
+			return client;
 		}
 	};
 }

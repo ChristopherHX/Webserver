@@ -46,29 +46,30 @@ ByteArray DualByteArray::GetRange(int offset, int length)
 
 int DualByteArray::Length()
 {
-	//return _arrays[0].Length() + ((_arrays.size() > 1) ? _arrays[1].Length() : 0);
 	return _arrays[0].Length();
 }
 
 
 int DualByteArray::IndexOf(const char * buffer, int length, int offset, int &mlength)
 {
-	int l1 = _arrays[0].Length();
-	int i1 = _arrays[0].IndexOf(buffer, length, offset, mlength);
-	if (length == mlength || _arrays.size() < 2)
+	int i = -1, l1 = _arrays[0].Length();
+	if(offset < l1)
 	{
-		return i1;
-	}
-	if (_arrays.size() > 1)
-	{
-		if (mlength < length && mlength > 0 && memcmp(_arrays[1].Data(), buffer + mlength, length - mlength) == 0)
+		i = _arrays[0].IndexOf(buffer, length, offset, mlength);
+		if (length == mlength || _arrays.size() < 2)
 		{
-			mlength = length;
-			return i1;
+			return i;
 		}
-		mlength = 0;
-		//return _arrays[1].IndexOf(buffer, length, offset - l1, mlength);
+		if (_arrays.size() > 1 && mlength > 0)
+		{
+			if (memcmp(_arrays[1].Data(), buffer + mlength, length - mlength) == 0)
+			{
+				mlength = length;
+				return i;
+			}
+		}
 	}
+	mlength = 0;
 	return -1;
 }
 
@@ -81,8 +82,3 @@ int DualByteArray::IndexOf(std::string string, int offset, int &mlength)
 {
 	return IndexOf(string.data(), string.length(), offset, mlength);
 }
-
-//char & DualByteArray::operator[](int i)
-//{
-//	return i < _arrays[0].Length() ? _arrays[0][i] : _arrays[1][i - _arrays[0].Length()];
-//}

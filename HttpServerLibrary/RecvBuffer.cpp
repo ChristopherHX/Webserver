@@ -20,12 +20,12 @@
 
 using namespace HttpServer;
 
-HttpServer::RecvBuffer::RecvBuffer(RecvBuffer && obj) : buffer(std::move(obj.buffer)), capacity(obj.capacity), readpos(obj.readpos), writepos(obj.writepos), recvstate(obj.recvstate), blocksize(obj.blocksize), ip(obj.ip), ssl(obj.ssl)
+HttpServer::RecvBuffer::RecvBuffer(RecvBuffer && obj) : buffer(std::move(obj.buffer)), capacity(obj.capacity), readpos(obj.readpos), writepos(obj.writepos), recvstate(obj.recvstate), blocksize(obj.blocksize), client(obj.client), ssl(obj.ssl)
 {
 	
 }
 
-RecvBuffer::RecvBuffer(uintptr_t socket, const int capacity, std::string ip, void * ssl) : socket(socket), buffer(capacity), capacity(capacity), readpos(0), writepos(0), recvstate(false), blocksize(capacity >> 4), ip(ip), ssl(ssl)
+RecvBuffer::RecvBuffer(uintptr_t socket, const int capacity, std::string client, void * ssl) : socket(socket), buffer(capacity), capacity(capacity), readpos(0), writepos(0), recvstate(false), blocksize(capacity >> 4), client(client), ssl(ssl)
 {
 	
 }
@@ -40,7 +40,6 @@ RecvBuffer::~RecvBuffer()
 	shutdown(socket, SHUT_RDWR);
 	close(socket);
 #endif
-	StopRecvData();
 }
 
 bool HttpServer::RecvBuffer::isSecure()
@@ -95,14 +94,14 @@ void RecvBuffer::RecvData(std::function<int(RecvBuffer*, DualByteArray)> callbac
 	recvstate = false;
 }
 
-void RecvBuffer::StopRecvData()
-{
-	recvstate = false;
-}
-
 bool RecvBuffer::RecvDataState()
 {
 	return recvstate;
+}
+
+void RecvBuffer::RecvDataState(bool recvstate)
+{
+	this->recvstate = recvstate;
 }
 
 int RecvBuffer::Send(const std::string &str)
