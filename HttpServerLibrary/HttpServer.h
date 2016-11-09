@@ -5,6 +5,7 @@
 #include <cstring>
 #include <atomic>
 #include <cstdint>
+#include <experimental/filesystem>
 
 namespace HttpServer
 {
@@ -20,14 +21,27 @@ namespace HttpServer
 		FileUpload,
 	};
 
+	class ServerException : public std::exception
+	{
+	private:
+		const std::string message;
+	public:
+		ServerException(const std::string &message) : message(message)
+		{
+		}
+		const char* what() const noexcept override {
+			return message.data();
+		}
+	};
+
 	class Server
 	{
 	private:
 		void * servermain;
 		std::atomic<bool> servermainstop;
-		uintptr_t serverSocket, sslServerSocket;
+		uintptr_t httpServerSocket, httpsServerSocket;
 		bool showFolder;
-		std::string rootfolder;
+		std::experimental::filesystem::path rootfolder;
 		void processRequest(std::unique_ptr<RecvBuffer> pbuffer);
 	public:
 		Server();

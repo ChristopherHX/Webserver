@@ -30,7 +30,6 @@
 #include <map>
 #include <fstream>
 #include <sstream>
-#include <experimental/filesystem>
 #include <iostream>
 #include <cstdio>
 
@@ -52,10 +51,10 @@ Server::~Server()
 	Stoppen();
 }
 
-bool CreateServerSocket(uintptr_t &serverSocket, int port)
+bool CreateServerSocket(uintptr_t &httpServerSocket, int port)
 {
-	serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-	if(serverSocket == -1)
+	httpServerSocket = socket(AF_INET, SOCK_STREAM, 0);
+	if(httpServerSocket == -1)
 	{
 		std::cerr << "Kann den Socket nicht erstellen!";
 		return false;
@@ -65,12 +64,12 @@ bool CreateServerSocket(uintptr_t &serverSocket, int port)
 	serverAdresse.sin_addr.s_addr = INADDR_ANY;
 	serverAdresse.sin_port = htons(port);
 
-	if (bind(serverSocket, (sockaddr *)&serverAdresse, sizeof(serverAdresse)) == -1)
+	if (bind(httpServerSocket, (sockaddr *)&serverAdresse, sizeof(serverAdresse)) == -1)
 	{
 		std::cerr << "Kann den Socket nicht Binden!\n";
 		return false;
 	}
-	if (listen(serverSocket, 10) == -1)
+	if (listen(httpServerSocket, 10) == -1)
 	{
 		std::cerr << "Kann den Socket nicht Abhören!\n";
 		return false;
@@ -98,8 +97,8 @@ void Server::Starten(const int httpPort, const int httpsPort)
 	fs::path publicchain = certroot / "fullchain.pem";
 	fs::path privatekey = certroot / "privkey.pem";
 
-	serverSocket = -1;
-	sslServerSocket = -1;
+	httpServerSocket = -1;
+	httpsServerSocket = -1;
 
 	if (fs::is_regular_file(publicchain) && fs::is_regular_file(privatekey))
 	{
@@ -117,7 +116,7 @@ void Server::Starten(const int httpPort, const int httpsPort)
 			ERR_print_errors_fp(stderr);
 			return;
 		}
-		if(!CreateServerSocket(sslServerSocket, httpsPort > 0 ? httpsPort : 433))
+		if(!CreateServerSocket(httpsServerSocket, httpsPort > 0 ? httpsPort : 433))
 		{
 			return;
 		}
@@ -128,13 +127,13 @@ void Server::Starten(const int httpPort, const int httpsPort)
 		return;
 	}
 
-	if(!CreateServerSocket(serverSocket, httpPort > 0 ? httpPort : 80))
+	if(!CreateServerSocket(httpServerSocket, httpPort > 0 ? httpPort : 80))
 	{
 		return;
 	}
 	servermainstop.store(true);
 	servermain = (void*)new std::thread([this, ctx]() {
-		int nfds = std::max(serverSocket != -1 ? serverSocket : 0, sslServerSocket != -1 ? sslServerSocket : 0) + 1;
+		int nfds = std::max(httpServerSocket != -1 ? httpServerSocket : 0, httpsServerSocket != -1 ? httpsServerSocket : 0) + 1;
 		fd_set sockets;
 		timeval timeout;
 		sockaddr_in clientAdresse;
@@ -144,22 +143,22 @@ void Server::Starten(const int httpPort, const int httpsPort)
 		{
 			timeout.tv_sec = 1;
 			timeout.tv_usec = 0;
-			if (serverSocket != -1)
+			if (httpServerSocket != -1)
 			{
-				FD_SET(serverSocket, &sockets);
+				FD_SET(httpServerSocket, &sockets);
 			}
-			if (sslServerSocket != -1)
+			if (httpsServerSocket != -1)
 			{
-				FD_SET(sslServerSocket, &sockets);
+				FD_SET(httpsServerSocket, &sockets);
 			}
 			select(nfds, &sockets, nullptr, nullptr, &timeout);
-			if((serverSocket != -1 && FD_ISSET(serverSocket, &sockets)) || (sslServerSocket != -1 && FD_ISSET(sslServerSocket, &sockets)))
+			if((httpServerSocket != -1 && FD_ISSET(httpServerSocket, &sockets)) || (httpsServerSocket != -1 && FD_ISSET(httpsServerSocket, &sockets)))
 			{
-				uintptr_t clientSocket = accept(FD_ISSET(serverSocket, &sockets) ? serverSocket : sslServerSocket, (sockaddr *)&clientAdresse, &clientAdresse_len);
+				uintptr_t clientSocket = accept(FD_ISSET(httpServerSocket, &sockets) ? httpServerSocket : httpsServerSocket, (sockaddr *)&clientAdresse, &clientAdresse_len);
 				if (clientSocket != -1)
 				{
 					SSL *ssl = nullptr;
-					if(FD_ISSET(sslServerSocket, &sockets))
+					if(FD_ISSET(httpsServerSocket, &sockets))
 					{
 						ssl = SSL_new(ctx);
 						SSL_set_fd(ssl, clientSocket);
@@ -180,24 +179,24 @@ void Server::Stoppen()
 	if (!servermainstop.load())
 		return;
 	servermainstop.store(false);
-	if(serverSocket != -1)
+	if(httpServerSocket != -1)
 	{
 #ifdef _WIN32
-		shutdown(serverSocket, SD_BOTH);
-		closesocket(serverSocket);
+		shutdown(httpServerSocket, SD_BOTH);
+		closesocket(httpServerSocket);
 #else
-		shutdown(serverSocket, SHUT_RDWR);
-		close(serverSocket);
+		shutdown(httpServerSocket, SHUT_RDWR);
+		close(httpServerSocket);
 #endif
 	}
-	if(sslServerSocket != -1)
+	if(httpsServerSocket != -1)
 	{
 #ifdef _WIN32
-		shutdown(sslServerSocket, SD_BOTH);
-		closesocket(sslServerSocket);
+		shutdown(httpsServerSocket, SD_BOTH);
+		closesocket(httpsServerSocket);
 #else
-		shutdown(sslServerSocket, SHUT_RDWR);
-		close(sslServerSocket);
+		shutdown(httpsServerSocket, SHUT_RDWR);
+		close(httpsServerSocket);
 #endif
 	}
 	((std::thread*)servermain)->join();
@@ -223,7 +222,7 @@ struct FileUploadArgs
 	std::ofstream fileStream;
 	int proccessedContent;
 	int ContentLength;
-	std::string filepath;
+	fs::path serverPath;
 };
 
 void Server::processRequest(std::unique_ptr<RecvBuffer> buffer)
@@ -248,7 +247,6 @@ void Server::processRequest(std::unique_ptr<RecvBuffer> buffer)
 				RequestHeader requestHeader(range.Data(), range.Length());
 				status.path = buffer->Client() + " -> " + requestHeader.httpMethode + ":" + requestHeader.requestPath;
 				if (Request) Request(&status);
-				std::string filepath = rootfolder + requestHeader.requestPath;
 				if (!buffer->isSecure())
 				{
 					responseHeader.status = MovedPermanently;
@@ -265,85 +263,95 @@ void Server::processRequest(std::unique_ptr<RecvBuffer> buffer)
 					responseHeader["Connection"] = "keep-alive";
 					if (requestHeader.httpMethode == "GET" || requestHeader.httpMethode == "HEAD")
 					{
-						if (!showFolder && requestHeader.requestPath == "/")
+						try
 						{
-							responseHeader.status = MovedPermanently;
-							responseHeader["Location"] = "/index.html";
-							buffer->Send(responseHeader.toString());
-							buffer->RecvDataState(false);
-							return 0;
-						}
-						else if (requestHeader.requestPath == "/folderview.html")
-						{
-							std::stringstream contentstream;
-							std::string folderpath(ParameterValues(String::Replace(std::move(requestHeader.putPath), "%2F", "/"))["folder"]);
-							contentstream << "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><link rel=\"stylesheet\" href=\"/folder.css\" type=\"text/css\"/></head><body><div id=\"path\">" << folderpath << "</div>";
-							if(folderpath != "/") contentstream << "<div><a class=\"button button3\" href=\"/folderview.html?folder=" << folderpath.substr(0, folderpath.find_last_of('/', folderpath.length() - 2)) << "/\" target=\"_self\">..</button></div>";
-							for (fs::directory_entry entry : fs::directory_iterator(rootfolder + folderpath))
+							if (!showFolder && requestHeader.requestPath == "/")
 							{
-								std::string name(entry.path().filename().string());
-								fs::file_status status(entry.status());
-								switch (status.type())
+								responseHeader.status = MovedPermanently;
+								responseHeader["Location"] = "/index.html";
+								buffer->Send(responseHeader.toString());
+								buffer->RecvDataState(false);
+								return 0;
+							}
+							else if (requestHeader.requestPath == "/folderview.html")
+							{
+								std::string serverPath(ParameterValues(String::Replace(std::move(requestHeader.putPath), "%2F", "/"))["folder"]);							
+								fs::path folderPath = rootfolder / serverPath;
+								if(fs::is_directory(folderPath))
 								{
-								case fs::file_type::regular:
-									contentstream << "<div><a class=\"button button1\" href=\"" << folderpath << name << "\" target=\"_top\">" << name << "</a><a class=\"button button2\" href=\"" << folderpath << name << "?download\"></a></div>";
-									break;
-								case fs::file_type::directory:
-									contentstream << "<div><a class=\"button button3\" href=\"/folderview.html?folder=" << folderpath << name << "/\" target=\"_self\">" << name << "</button></div>";
-									break;
-								default:
-									break;
+									std::stringstream contentstream;
+									contentstream << "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><link rel=\"stylesheet\" href=\"/folder.css\" type=\"text/css\"/></head><body><div id=\"path\">" << serverPath << "</div>";
+									if(serverPath != "/") contentstream << "<div><a class=\"button button3\" href=\"/folderview.html?folder=" << serverPath.substr(0, serverPath.find_last_of('/', serverPath.length() - 2)) << "/\" target=\"_self\">..</button></div>";
+									for (fs::directory_entry entry : fs::directory_iterator(folderPath))
+									{
+										std::string name(entry.path().filename().string());
+										fs::file_status status(entry.status());
+										switch (status.type())
+										{
+										case fs::file_type::regular:
+											contentstream << "<div><a class=\"button button1\" href=\"" << serverPath << name << "\" target=\"_top\">" << name << "</a><a class=\"button button2\" href=\"" << serverPath << name << "?download\"></a></div>";
+											break;
+										case fs::file_type::directory:
+											contentstream << "<div><a class=\"button button3\" href=\"/folderview.html?folder=" << serverPath << name << "/\" target=\"_self\">" << name << "</button></div>";
+											break;
+										default:
+											break;
+										}
+									}
+									contentstream << "</body>";
+									std::string content(contentstream.str());
+									responseHeader.status = Ok;
+									snprintf(buf.Data(), buf.Length(), "%zu", content.length());
+									responseHeader["Content-Type"] = "text/html; charset=utf-8";
+									responseHeader["Content-Length"] = buf.Data();
+									responseHeader["Cache-Control"] = "no-store, must-revalidate";
+									buffer->Send(responseHeader.toString());
+									if (requestHeader.httpMethode != "HEAD")
+									{
+										buffer->Send(content);
+									}
+								}
+								else
+								{
+									throw ServerException("Folder not exists");
 								}
 							}
-							contentstream << "</body>";
-							std::string content(contentstream.str());
-							responseHeader.status = Ok;
-							snprintf(buf.Data(), buf.Length(), "%zu", content.length());
-							responseHeader["Content-Type"] = "text/html; charset=utf-8";
-							responseHeader["Content-Length"] = buf.Data();
-							responseHeader["Cache-Control"] = "no-store, must-revalidate";
-							buffer->Send(responseHeader.toString());
-							if (requestHeader.httpMethode != "HEAD")
+							else if(requestHeader.requestPath == "/benutzer.cpp")
 							{
-								buffer->Send(content);
+								std::stringstream contentstream;
+								contentstream << "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/></head><body>";
+								sscanf(requestHeader["Cookie"].data(), "Sessionid=%s", buf.Data());
+								contentstream << "<h1>Willkommen " << (benutzer.find(buf.Data()) != benutzer.end() ? benutzer[buf.Data()] : "Melde dich an!!!") <<" </h1>";
+								contentstream << "</body>";
+								std::string content(contentstream.str());
+								responseHeader.status = Ok;
+								snprintf(buf.Data(), buf.Length(), "%zu", content.length());
+								responseHeader["Content-Type"] = "text/html; charset=utf-8";
+								responseHeader["Content-Length"] = buf.Data();
+								responseHeader["Cache-Control"] = "no-store, must-revalidate";
+								buffer->Send(responseHeader.toString());
+								if (requestHeader.httpMethode != "HEAD")
+								{
+									buffer->Send(content);
+								}
 							}
-						}
-						else if(requestHeader.requestPath == "/benutzer.cpp")
-						{
-							std::stringstream contentstream;
-							contentstream << "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/></head><body>";
-							sscanf(requestHeader["Cookie"].data(), "Sessionid=%s", buf.Data());
-							contentstream << "<h1>Willkommen " << (benutzer.find(buf.Data()) != benutzer.end() ? benutzer[buf.Data()] : "Melde dich an!!!") <<" </h1>";
-							contentstream << "</body>";
-							std::string content(contentstream.str());
-							responseHeader.status = Ok;
-							snprintf(buf.Data(), buf.Length(), "%zu", content.length());
-							responseHeader["Content-Type"] = "text/html; charset=utf-8";
-							responseHeader["Content-Length"] = buf.Data();
-							responseHeader["Cache-Control"] = "no-store, must-revalidate";
-							buffer->Send(responseHeader.toString());
-							if (requestHeader.httpMethode != "HEAD")
+							else
 							{
-								buffer->Send(content);
-							}
-						}
-						else
-						{
-							fs::file_status fstate = fs::status(filepath);
-							switch (fstate.type())
-							{
-							case fs::file_type::regular:
-							{
+								fs::path filepath = rootfolder / requestHeader.requestPath;
+								if(!is_regular_file(filepath))
+								{
+									throw ServerException("File or Folder not exists");								
+								}
 								time_t date = fs::file_time_type::clock::to_time_t(fs::last_write_time(filepath));
 								strftime(buf.Data(), buf.Length(), "%a, %d-%b-%G %H:%M:%S GMT", std::gmtime(&date));
 								if (requestHeader.Exists("If-Modified-Since") && requestHeader["If-Modified-Since"] == buf.Data())
 								{
 									responseHeader.status = NotModified;
 									buffer->Send(responseHeader.toString());
-									break;
+									return header + l;
 								}
 								responseHeader["Last-Modified"] = buf.Data();
-								std::ifstream file = std::ifstream(filepath.data(), std::ios::binary);
+								std::ifstream file = std::ifstream(filepath, std::ios::binary);
 								if (file.is_open())
 								{
 									uintmax_t filesize = fs::file_size(filepath), a = 0, b = filesize - 1;
@@ -351,7 +359,7 @@ void Server::processRequest(std::unique_ptr<RecvBuffer> buffer)
 									{
 										std::string & ranges(requestHeader["Range"]);
 										sscanf(ranges.data(), "bytes=%ju-%ju", &a, &b);
-										if (filesize > (b - a) && (intmax_t)(b - a) >= 0)
+										if (filesize > (b - a))
 										{
 											responseHeader.status = PartialContent;
 											snprintf(buf.Data(), buf.Length(), "bytes=%ju-%ju/%ju", a, b, filesize);
@@ -361,7 +369,7 @@ void Server::processRequest(std::unique_ptr<RecvBuffer> buffer)
 										{
 											responseHeader.status = RangeNotSatisfiable;
 											buffer->Send(responseHeader.toString());
-											break;
+											return header + l;
 										}
 									}
 									else
@@ -387,26 +395,22 @@ void Server::processRequest(std::unique_ptr<RecvBuffer> buffer)
 								}
 								else
 								{
-									std::cerr << "File can't opened:" << filepath << "\n";
+									throw ServerException("File open failed");;
 								}
-								break;
-							}
-							default:
-							{
-								responseHeader.status = NotFound;
-								std::string errorpage("<!DOCTYPE html><HTML><HEAD><TITLE>Not Found</TITLE></HEAD><BODY><div><a>404 Not Found</a></div></BODY></HTML>");
-								snprintf(buf.Data(), buf.Length(), "%zu", errorpage.length());
-								responseHeader["Content-Length"] = buf.Data();
-								buffer->Send(responseHeader.toString());
-								if (requestHeader.httpMethode != "HEAD")
-								{
-									buffer->Send(errorpage);
-								}
-								break;
-							}
 							}
 						}
-						if (status.Progress) status.Progress(100);
+						catch(const std::exception &ex)
+						{
+							responseHeader.status = NotFound;
+							std::string errorpage("<!DOCTYPE html><HTML><HEAD><TITLE>Not Found Error</TITLE></HEAD><BODY><div><h1>" + std::move(std::string(ex.what())) + "</h1></div></BODY></HTML>");
+							snprintf(buf.Data(), buf.Length(), "%zu", errorpage.length());
+							responseHeader["Content-Length"] = buf.Data();
+							buffer->Send(responseHeader.toString());
+							if (requestHeader.httpMethode != "HEAD")
+							{
+								buffer->Send(errorpage);
+							}
+						}
 					}
 					else if (requestHeader.httpMethode == "POST")
 					{
@@ -423,14 +427,14 @@ void Server::processRequest(std::unique_ptr<RecvBuffer> buffer)
 						}
 						else if (requestHeader.requestPath == "/uploadfiles" && memcmp(contenttype.data(), "multipart/form-data", 19) == 0)
 						{
-							std::string folderpath(rootfolder + requestHeader.putPath);
-							if (fs::is_directory(folderpath))
+							fs::path serverPath(rootfolder / requestHeader.putPath);
+							if (fs::is_directory(serverPath))
 							{
 								FileUploadArgs args;
 								args.contentSeperator = "--" + ParameterValues(contenttype)["boundary"];
 								args.proccessedContent = 0;
 								args.ContentLength = std::stoull(requestHeader["Content-Length"]);
-								args.filepath = std::move(folderpath);
+								args.serverPath = std::move(serverPath);
 								buffer->RecvData([&args, &status, &responseHeader](RecvBuffer * buffer, DualByteArray array){
 									if (status.Progress) status.Progress(100 * args.proccessedContent / args.ContentLength);
 									int contentSeperatormatch, contentSeperatorI = array.IndexOf(args.contentSeperator, 0, contentSeperatormatch);
@@ -457,7 +461,7 @@ void Server::processRequest(std::unique_ptr<RecvBuffer> buffer)
 											{
 												ByteArray range(std::move(array.GetRange(contentSeperatorEndI, fileHeaderEndI - contentSeperatorEndI)));
 												std::string name = ParameterValues(Parameter(std::string(range.Data(), range.Length()))["Content-Disposition"])["name"];
-												args.fileStream.open((args.filepath + "/" + name.substr(1, name.length() - 2)).data(), std::ios::binary);
+												args.fileStream.open((args.serverPath / name.substr(1, name.length() - 2)), std::ios::binary);
 												int proccessed = fileHeaderEndI + match;
 												args.proccessedContent += proccessed;
 											}
@@ -513,9 +517,9 @@ void Server::processRequest(std::unique_ptr<RecvBuffer> buffer)
 				}
 			}
 		}
-		catch (const std::exception& exc)
+		catch (const std::exception& ex)
 		{
-			std::cout << "Error:" << exc.what() << "\n";
+			std::cout << "Error:" << ex.what() << "\n";
 		}
 		return 0;
 	});
