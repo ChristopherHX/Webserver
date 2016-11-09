@@ -107,13 +107,13 @@ void Server::Starten(const int httpPort, const int httpsPort)
 		OpenSSL_add_ssl_algorithms();
 
 		ctx = SSL_CTX_new(TLS_server_method());
-
-		if (SSL_CTX_use_certificate_chain_file((SSL_CTX*)ctx, publicchain.c_str()) < 0) {
+		
+		if (SSL_CTX_use_certificate_chain_file(ctx, publicchain.generic_u8string().c_str()) < 0) {
 			ERR_print_errors_fp(stderr);
 			return;
 		}
 
-		if (SSL_CTX_use_PrivateKey_file((SSL_CTX*)ctx, privatekey.c_str(), SSL_FILETYPE_PEM) < 0) {
+		if (SSL_CTX_use_PrivateKey_file(ctx, publicchain.generic_u8string().c_str(), SSL_FILETYPE_PEM) < 0) {
 			ERR_print_errors_fp(stderr);
 			return;
 		}
@@ -401,7 +401,7 @@ void Server::processRequest(std::unique_ptr<RecvBuffer> buffer)
 									{
 										responseHeader.status = Ok;
 									}
-									if(fs::path(filepath).extension() == "html" || fs::path(filepath).extension() == "htm")
+									if(filepath == "html" || filepath.extension() == "htm")
 									{
 										responseHeader["Content-Type"] = "text/html; charset=utf-8";
 									}
