@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 #include <cstring>
 #include <map>
 
@@ -11,13 +12,14 @@ public:
 namespace Http
 {
 	const std::string Ok("200 Ok");
-	const std::string NotFound("404 NotFound");
-	const std::string NotImplemented("501 Not Implemented");
-	const std::string SeeOther("303 See Other");
-	const std::string MovedPermanently("301 Moved Permanently");
-	const std::string NotModified("304 Not Modified");
 	const std::string PartialContent("206 Partial Content");
+	const std::string MovedPermanently("301 Moved Permanently");
+	const std::string SeeOther("303 See Other");
+	const std::string NotModified("304 Not Modified");
+	const std::string NotFound("404 NotFound");
 	const std::string RangeNotSatisfiable("416 Range Not Satisfiable");
+	const std::string InternalServerError("500 Internal Server Error");
+	const std::string NotImplemented("501 Not Implemented");
 
 	class ParameterValues
 	{
@@ -36,6 +38,7 @@ namespace Http
 		Parameter(std::string paramstr);
 		std::string &operator[](const std::string &key);
 		bool Exists(std::string key);
+		void Clear();
 		std::string toString();
 	private:
 		std::map<std::string, std::string> parameter;

@@ -1,8 +1,6 @@
-/*header {
-    height: auto;
-}*/
 * {
     box-sizing: border-box;
+    font-family: Calibri, 'Gill Sans', 'Gill Sans MT', 'Trebuchet MS', sans-serif
 }
 
 .button {
@@ -30,7 +28,7 @@
 .button2 {
     width:20px;
     height:20px;
-    background-image: url(/download-arrow.png);
+    background-image: url(/img/download-arrow.png);
     background-size: contain;
 }
 
@@ -45,7 +43,6 @@
 
 #frame {
     border: none;
-    background-color: cadetblue;
     height: calc(100% - 100px);
     padding: 0;
     align-content: center;

@@ -37,7 +37,7 @@ char & ByteArray::operator[](int i)
 	return _array[i];
 }
 
-int ByteArray::Length()
+const int &ByteArray::Length()
 {
 	return _length;
 }

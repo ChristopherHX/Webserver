@@ -3,14 +3,28 @@
 #include <iostream>
 #include <string>
 
+#ifdef _WIN32
+#include <Windows.h>
+#else
+#include <unistd.h>
+#endif
+
 using namespace HttpServer;
+namespace fs = std::experimental::filesystem;
 
 int main(int argc, const char** argv)
 {
     Server server;
     std::string command = "";
-    server.SetRootFolder("./Web");
-    server.ShowFolder(false);
+	char * buf = new char[512];
+#ifdef _WIN32
+	GetModuleFileNameA(NULL, buf, 512);
+#else
+	readlink("/proc/self/exe", buf, 512);
+#endif
+	fs::path p = buf;
+	delete[] buf;
+    server.SetRootFolder(p.parent_path() / ".." / "web");
      server.Request = [](RequestArgs * args){
          std::cout << args->path << "\n";
          args->Progress = [](int prog){

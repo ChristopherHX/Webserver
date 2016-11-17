@@ -43,6 +43,11 @@ bool Http::Parameter::Exists(std::string key)
 	return parameter.find(key) != parameter.end();
 }
 
+void Http::Parameter::Clear()
+{
+	parameter.clear();
+}
+
 std::string Parameter::toString()
 {
 	std::stringstream ss;

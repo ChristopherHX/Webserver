@@ -16,7 +16,7 @@ public:
 	~ByteArray();
 	char* Data();
 	char &operator[](int i);
-	int Length();
+	const int &Length();
 	int IndexOf(const char * buffer, int blength, int offset, int &mlength);
 	int IndexOf(const char * cstring, int offset, int & mlength);
 	int IndexOf(std::string string, int offset, int & mlength);

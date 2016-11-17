@@ -1,5 +1,5 @@
 #pragma once
-#include "RecvBuffer.h"
+#include "HttpRequestBuffer.h"
 
 #include <functional>
 #include <cstring>
@@ -7,18 +7,15 @@
 #include <cstdint>
 #include <experimental/filesystem>
 
-namespace HttpServer
+namespace Http
 {
+	void CreateServerSocket(uintptr_t & serverSocket, int port);
+	void CloseSocket(uintptr_t & socket);
+
 	struct RequestArgs
 	{
 		std::string path;
 		std::function<void(int)> Progress;
-	};
-
-	enum RequestState
-	{
-		HandleRequest,
-		FileUpload,
 	};
 
 	class ServerException : public std::exception
@@ -34,22 +31,29 @@ namespace HttpServer
 		}
 	};
 
+	class NotFoundException : public ServerException
+	{
+	public:
+		NotFoundException(const std::string &message) : ServerException(message)
+		{
+
+		}
+	};
+
 	class Server
 	{
 	private:
 		void * servermain;
 		std::atomic<bool> servermainstop;
 		uintptr_t httpServerSocket, httpsServerSocket;
-		bool showFolder;
 		std::experimental::filesystem::path rootfolder;
-		void processRequest(std::unique_ptr<RecvBuffer> pbuffer);
+		void processRequest(std::unique_ptr<Http::RequestBuffer> pbuffer);
 	public:
 		Server();
 		~Server();
-		void Starten(const int port, const int sslport);
+		void Starten(const int httpPort, const int httpsPort);
 		void Stoppen();
-		void ShowFolder(bool show);
-		void SetRootFolder(std::string path);
+		void SetRootFolder(std::experimental::filesystem::path path);
 		std::function<void(RequestArgs*)> Request;
 	};
 }
