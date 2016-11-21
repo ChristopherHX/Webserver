@@ -2,6 +2,7 @@
 #include "HttpRequestBuffer.h"
 #include "HttpServer.h"
 #include "ByteArray.h"
+#include "utility.h"
 #include <sstream>
 #include <experimental/filesystem>
 #include <list>
@@ -14,6 +15,7 @@ namespace fs = std::experimental::filesystem;
 static const std::string htmltop("<!DOCTYPE html>\
 <html>\
 <head>\
+	<meta charset=\"utf-8\"/>\
     <title>Datei Explorer</title>\
     <link rel=\"stylesheet\" href=\"/css/folder.css\" type=\"text/css\" />\
     <script src=\"/js/folder.js\" type=\"text/javascript\"></script>\
@@ -46,14 +48,14 @@ bool compare_nocase(const std::string& first, const std::string& second)
 	return (first.length() < second.length());
 }
 
-std::map<std::string, std::string> benutzer;
+std::unordered_map<std::string, std::string> benutzer;
 
 int seite(RequestBuffer& buffer)
 {
 	auto& requestHeader = buffer.Request();
-	if (requestHeader.httpMethode == "GET" || requestHeader.httpMethode == "HEAD")
+	if (requestHeader.methode == Get || requestHeader.methode == Head)
 	{
-		std::string serverPath(ParameterValues(String::Replace(std::move(requestHeader.putPath), "%2F", "/"))["folder"]);
+		std::string serverPath(requestHeader.putValues["folder"]);
 		fs::path folderPath = buffer.RootPath() / serverPath;
 		if (!fs::is_directory(folderPath))
 		{
@@ -79,9 +81,9 @@ int seite(RequestBuffer& buffer)
 		}
 		std::stringstream contentstream;
 		contentstream << htmltop;
-		if (benutzer.size() > 0)
+		if (benutzer.size() > 0 && requestHeader.Exists("Cookie") && requestHeader["Cookie"].Exists("Sessionid") && benutzer.find(requestHeader["Cookie"]["Sessionid"]) != benutzer.end())
 		{
-			contentstream << "<div>Letzte Anmeldung am Server als" << (benutzer.begin())->second << "</div><br/>";
+			contentstream << "<div>Angemeldet als " << benutzer[requestHeader["Cookie"]["Sessionid"]] << "</div><br/>";
 		}
 		contentstream << "<div id=\"path\">" << serverPath << "</div>";
 		if (serverPath != "/") contentstream << "<div><a class=\"button button3\" href=\"/libordner.so?folder=" << serverPath.substr(0, serverPath.find_last_of('/', serverPath.length() - 2)) << "/\" target=\"_self\">..</button></div>";
@@ -105,17 +107,17 @@ int seite(RequestBuffer& buffer)
 		responseHeader["Content-Length"] = buf.Data();
 		responseHeader["Cache-Control"] = "no-store, must-revalidate";
 		buffer.Send(responseHeader.toString());
-		if (requestHeader.httpMethode != "HEAD")
+		if (requestHeader.methode != Head)
 		{
 			buffer.Send(content);
 		}
 	}
-	else if (requestHeader.httpMethode == "POST")
+	else if (requestHeader.methode == Post)
 	{
-		std::string & contenttype = requestHeader["Content-Type"];
-		if (memcmp(contenttype.data(), "multipart/form-data", 19) == 0)
+		Values& contenttype = requestHeader["Content-Type"];
+		if (contenttype.Exists("multipart/form-data"))
 		{
-			fs::path serverPath(buffer.RootPath() / requestHeader.putPath);
+			fs::path serverPath(buffer.RootPath() / requestHeader.putValues["folder"]);
 			if (!fs::is_directory(serverPath))
 			{
 				throw NotFoundException("Ziel Ordner nicht gefunden");
@@ -124,60 +126,58 @@ int seite(RequestBuffer& buffer)
 			{
 				std::string contentSeperator;
 				std::ofstream fileStream;
-				int proccessedContent;
-				int ContentLength;
 				fs::path serverPath;
 			} args;
-			args.contentSeperator = "--" + ParameterValues(contenttype)["boundary"];
-			args.proccessedContent = 0;
-			args.ContentLength = std::stoull(requestHeader["Content-Length"]);
+			args.contentSeperator = "--" + contenttype["boundary"];
 			args.serverPath = std::move(serverPath);
 			buffer.RecvData([&args](RequestBuffer &buffer) -> int
 			{
-				int contentSeperatormatch, contentSeperatorI = buffer.IndexOf(args.contentSeperator, 0, contentSeperatormatch);//Working ???
+				int contentSeperatorI = buffer.IndexOf(args.contentSeperator, 0);
 				if (args.fileStream.is_open() && (contentSeperatorI == -1 || contentSeperatorI > 2))
 				{
-					const int data = std::min<unsigned int>(buffer.Length(), contentSeperatorI - 2);
+					const int data = contentSeperatorI == -1 ? (buffer.Length() - args.contentSeperator.length() + 1) : (contentSeperatorI - 2);
 					buffer.CopyTo(args.fileStream, data);
-					args.proccessedContent += std::max(data, contentSeperatorI);
 					return contentSeperatorI == -1 ? 0 : 2;
 				}
-				else if (contentSeperatorI != -1 && contentSeperatormatch == args.contentSeperator.length())
+				else if (contentSeperatorI != -1)
 				{
-					int contentSeperatorEndI = contentSeperatorI + args.contentSeperator.length() + 2;
-					int match, fileHeaderEndI = buffer.IndexOf("\r\n\r\n", contentSeperatorEndI, match);
-					if (args.fileStream.is_open()) args.fileStream.close();
-					if (fileHeaderEndI != -1)
+					int offset = contentSeperatorI + args.contentSeperator.length() + 2, fileHeader = buffer.IndexOf("\r\n\r\n", offset);
+					if (fileHeader != -1)
 					{
-						int proccessed = fileHeaderEndI + match;
-						if (match == 4)
+						buffer.Free(offset);
+						if (args.fileStream.is_open())
 						{
-							ByteArray range(std::move(buffer.GetRange(contentSeperatorEndI, fileHeaderEndI - contentSeperatorEndI)));
-							std::string name = ParameterValues(Parameter(std::string(range.Data(), range.Length()))["Content-Disposition"])["name"];
-							args.fileStream.open((args.serverPath / name.substr(1, name.length() - 2)), std::ios::binary);
-							args.proccessedContent += proccessed;
+							args.fileStream.close();
 						}
-						else
+						std::string name = Parameter(std::string(buffer.begin(), buffer.begin() + fileHeader))["Content-Disposition"]["name"];
+						args.fileStream.open((args.serverPath / name.substr(1, name.length() - 2)), std::ios::binary);
+						return fileHeader + 4 - offset;
+					}
+					fileHeader = buffer.IndexOf("\r\n", offset);
+					if (fileHeader != -1)
+					{
+						buffer.Free(offset);
+						if (args.fileStream.is_open())
 						{
-							auto &responseHeader = buffer.Response();
-							responseHeader.status = Ok;
-							buffer.Send(responseHeader.toString());
-							return ~proccessed;
+							args.fileStream.close();
 						}
-						return proccessed;
+						auto &responseHeader = buffer.Response();
+						responseHeader.status = Ok;
+						buffer.Send(responseHeader.toString());
+						return ~(fileHeader + 2 - offset);
 					}
 				}
 				return 0;
 			});
 			return 0;
 		}
-		else if (memcmp(requestHeader["Content-Type"].data(), "application/x-www-form-urlencoded", 33) == 0)
+		else if (requestHeader["Content-Type"].Exists("application/x-www-form-urlencoded"))
 		{
-			ByteArray range(buffer.GetRange(0, std::stoull(requestHeader["Content-Length"])));
-			int m, m2, un = range.IndexOf("UserName=", 0, m);
-			std::string username(range.Data(), un + m, range.IndexOf("&", un + m, m2) - (un + m));
-			int up = range.IndexOf("Password=", un + m, m);
-			std::string password(range.Data(), up + m, range.Length() - (up + m));
+			unsigned long long contentlength = std::stoull(requestHeader["Content-Length"].toString());
+			int un = buffer.IndexOf("UserName=", 0);
+			std::string username(buffer.begin() + un + 9, buffer.begin() + buffer.IndexOf("&", un + 9));
+			int up = buffer.IndexOf("Password=", un + 9);
+			std::string password(buffer.begin() + up + 9, buffer.begin() + contentlength);
 			ByteArray buf(33);
 			for (int i = 0; i < 32; i++)
 			{
@@ -188,10 +188,10 @@ int seite(RequestBuffer& buffer)
 			auto &responseHeader = buffer.Response();
 			responseHeader["Set-Cookie"] = "Sessionid=" + sessionid + "; Secure; HttpOnly";
 			responseHeader.status = SeeOther;
-			responseHeader["Location"] = "/benutzer.cpp";
+			responseHeader["Location"] = "/libordner.so";
 			buffer.Send(responseHeader.toString());
-			benutzer[sessionid] = username;
-			return range.Length();
+			benutzer[sessionid] = Utility::urlDecode(username);
+			return contentlength;
 		}
 	}
 	return 0;

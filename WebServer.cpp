@@ -9,13 +9,13 @@
 #include <unistd.h>
 #endif
 
-using namespace HttpServer;
+using namespace Http;
 namespace fs = std::experimental::filesystem;
 
 int main(int argc, const char** argv)
 {
     Server server;
-    std::string command = "";
+    std::string command = "start";
 	char * buf = new char[512];
 #ifdef _WIN32
 	GetModuleFileNameA(NULL, buf, 512);
@@ -25,16 +25,15 @@ int main(int argc, const char** argv)
 	fs::path p = buf;
 	delete[] buf;
     server.SetRootFolder(p.parent_path() / ".." / "web");
-     server.Request = [](RequestArgs * args){
-         std::cout << args->path << "\n";
-         args->Progress = [](int prog){
-             std::cout << "Progress:" << prog << "\r";
-             if(prog == 100) std::cout << "\n";
-         };
-     };
+    server.OnRequest([](RequestArgs &args){
+        std::cout << args.path << "\n";
+        args.Progress = [](int prog){
+            std::cout << "Progress:" << prog << "\r";
+            if(prog == 100) std::cout << "\n";
+        };
+    });
     do
     {
-        std::getline(std::cin, command);
         if(command == "start")
         {
             server.Starten(80, 443);
@@ -45,6 +44,7 @@ int main(int argc, const char** argv)
             server.Stoppen();
             std::cout << "Server gestoppt.\n";
         }
+		std::getline(std::cin, command);
     } while(command != "exit");
     server.Stoppen();
     std::cout << "Server beendet.\n";

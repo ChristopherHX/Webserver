@@ -1,7 +1,8 @@
 #pragma once
 #include <string>
 #include <cstring>
-#include <map>
+#include <unordered_map>
+#include <iterator>
 
 class String
 {
@@ -21,14 +22,21 @@ namespace Http
 	const std::string InternalServerError("500 Internal Server Error");
 	const std::string NotImplemented("501 Not Implemented");
 
-	class ParameterValues
+	const std::string Get("GET");
+	const std::string Head("HEAD");
+	const std::string Post("POST");
+
+	class Values
 	{
 	public:
-		ParameterValues(std::string valuestr);
+		Values();
+		Values(const std::string &values);
+		Values(const char* values);
 		std::string &operator[](const std::string &key);
 		bool Exists(std::string key);
+		std::string toString();
 	private:
-		std::map<std::string, std::string> values;
+		std::unordered_map<std::string, std::string> values;
 	};
 
 	class Parameter
@@ -36,31 +44,30 @@ namespace Http
 	public:
 		Parameter();
 		Parameter(std::string paramstr);
-		std::string &operator[](const std::string &key);
+		Values &operator[](const std::string &key);
 		bool Exists(std::string key);
 		void Clear();
 		std::string toString();
 	private:
-		std::map<std::string, std::string> parameter;
+		std::unordered_map<std::string, Values> parameter;
 	};
 
-	class RequestHeader : public Parameter
+	class Request : public Parameter
 	{
 	public:
-		RequestHeader();
-		RequestHeader(const char * header, int length);
-		RequestHeader(std::string headerstr);
+		Request();
+		Request(std::string headerstr);
 		std::string toString();
-		std::string httpMethode;
-		std::string requestPath;
-		std::string putPath;
+		std::string methode;
+		std::string request;
+		Values putValues;
 	};
 
-	class ResponseHeader : public Parameter
+	class Response : public Parameter
 	{
 	public:
-		ResponseHeader();
-		ResponseHeader(std::string headerstr);
+		Response();
+		Response(std::string headerstr);
 		std::string toString();
 		std::string status;
 	};

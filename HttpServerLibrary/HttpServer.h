@@ -9,9 +9,6 @@
 
 namespace Http
 {
-	void CreateServerSocket(uintptr_t & serverSocket, int port);
-	void CloseSocket(uintptr_t & socket);
-
 	struct RequestArgs
 	{
 		std::string path;
@@ -48,12 +45,15 @@ namespace Http
 		uintptr_t httpServerSocket, httpsServerSocket;
 		std::experimental::filesystem::path rootfolder;
 		void processRequest(std::unique_ptr<Http::RequestBuffer> pbuffer);
+		std::function<void(RequestArgs&)> onrequest;
 	public:
 		Server();
 		~Server();
 		void Starten(const int httpPort, const int httpsPort);
 		void Stoppen();
-		void SetRootFolder(std::experimental::filesystem::path path);
-		std::function<void(RequestArgs*)> Request;
+		void CreateServerSocket(uintptr_t & serverSocket, int port);
+		void CloseSocket(uintptr_t & serverSocket);
+		void SetRootFolder(const std::experimental::filesystem::path & path);
+		void OnRequest(std::function<void(RequestArgs&)> onrequest);
 	};
 }

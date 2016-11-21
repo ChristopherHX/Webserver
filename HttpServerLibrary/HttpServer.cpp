@@ -13,7 +13,7 @@
 #define dlopen(name) LoadLibraryW(name)
 #define dlsym(lib, symbol) GetProcAddress(lib, symbol)
 #define dlclose(lib) FreeLibrary(lib)
-#define extsymbol "?seite@@Http@@AEAVRecvBuffer@@@Z"
+#define extsymbol "?seite@@YAHAEAVRequestBuffer@Http@@@Z"
 #else
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -26,7 +26,7 @@
 #define closesocket(socket) close(socket)
 #define libext ".so"
 #define dlopen(name) dlopen(name, RTLD_LAZY)
-#define extsymbol "_Z5seiteRNSt12experimental10filesystem2v17__cxx114pathERN4Http13RequestHeaderERNS5_14ResponseHeaderERNS5_10RecvBufferER13DualByteArray"
+#define extsymbol "_Z5seiteRN4Http13RequestBufferE"
 #endif
 #include <ctime>
 #include <algorithm>
@@ -50,34 +50,6 @@
 using namespace Http;
 namespace fs = std::experimental::filesystem;
 
-void CreateServerSocket(uintptr_t &serverSocket, int port)
-{
-	serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-	if (serverSocket == -1)
-	{
-		throw ServerException(u8"Kann den Socket nicht erstellen");
-	}
-	sockaddr_in serverAdresse;
-	serverAdresse.sin_family = AF_INET;
-	serverAdresse.sin_addr.s_addr = INADDR_ANY;
-	serverAdresse.sin_port = htons(port);
-	if (bind(serverSocket, (sockaddr *)&serverAdresse, sizeof(serverAdresse)) == -1)
-	{
-		throw ServerException(u8"Kann den Socket nicht Binden");
-	}
-	if (listen(serverSocket, 10) == -1)
-	{
-		throw ServerException(u8"Kann den Socket nicht Abhören!\n");
-	}
-}
-
-void CloseSocket(uintptr_t &serverSocket)
-{
-	shutdown(serverSocket, SHUT_RDWR);
-	closesocket(serverSocket);
-	serverSocket = -1;
-}
-
 Server::Server()
 {
 	servermainstop.store(false);
@@ -100,7 +72,7 @@ void Server::Starten(const int httpPort, const int httpsPort)
 
 	fs::path certroot =
 #ifdef _WIN32
-		"./"
+		"../../"
 #else
 		"/etc/letsencrypt/live/p4fdf5699.dip0.t-ipconnect.de/"
 #endif
@@ -207,9 +179,42 @@ void Server::Stoppen()
 	delete (std::thread*)servermain;
 }
 
-void Server::SetRootFolder(fs::path path)
+void Server::CreateServerSocket(uintptr_t &serverSocket, int port)
+{
+	serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+	if (serverSocket == -1)
+	{
+		throw ServerException(u8"Kann den Socket nicht erstellen");
+	}
+	sockaddr_in serverAdresse;
+	serverAdresse.sin_family = AF_INET;
+	serverAdresse.sin_addr.s_addr = INADDR_ANY;
+	serverAdresse.sin_port = htons(port);
+	if (bind(serverSocket, (sockaddr *)&serverAdresse, sizeof(serverAdresse)) == -1)
+	{
+		throw ServerException(u8"Kann den Socket nicht Binden");
+	}
+	if (listen(serverSocket, 10) == -1)
+	{
+		throw ServerException(u8"Kann den Socket nicht Abhören!\n");
+	}
+}
+
+void Server::CloseSocket(uintptr_t &serverSocket)
+{
+	shutdown(serverSocket, SHUT_RDWR);
+	closesocket(serverSocket);
+	serverSocket = -1;
+}
+
+void Server::SetRootFolder(const fs::path &path)
 {
 	rootfolder = fs::canonical(path);
+}
+
+void Server::OnRequest(std::function<void(RequestArgs&)> onrequest)
+{
+	this->onrequest = onrequest;
 }
 
 void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
@@ -220,43 +225,43 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 #endif
 	RequestArgs status;
 	std::cout << buffer->Client() << " Verbunden\n";
-	buffer->RecvData([&status, &Request = Request](RequestBuffer &buffer) -> int
+	buffer->RecvData([&status, &OnRequest = onrequest](RequestBuffer &buffer) -> int
 	{
-		ResponseHeader &responseHeader = buffer.Response();
-		responseHeader.Clear();
-		responseHeader["Content-Length"] = "0";
+		Response &response = buffer.Response();
+		response.Clear();
+		response["Content-Length"] = "0";
 		ByteArray buf(128);
 		try
 		{
-			int l, header = buffer.IndexOf("\r\n\r\n", 0, l);
-			if (header > 0 && l == 4)
+			int header = buffer.IndexOf("\r\n\r\n", 0);
+			if (header > 0)
 			{
-				header += l;
-				ByteArray range(buffer.GetRange(0, header));
-				RequestHeader requestHeader(range.Data(), range.Length());
+				header += 4;
+				auto &reqest = buffer.Request() = Request(std::string(buffer.begin(), buffer.begin() + header));
 				buffer.Free(header);
-				status.path = buffer.Client() + " -> " + requestHeader.httpMethode + ":" + requestHeader.requestPath;
-				if (Request) Request(&status);
+				status.path = buffer.Client() + " -> " + reqest.methode + ":" + reqest.request;
+				if (OnRequest) OnRequest(status);
 				if (!buffer.isSecure())
 				{
-					responseHeader.status = MovedPermanently;
-					responseHeader["Connection"] = "close";
-					responseHeader["Location"] = "https://" + (requestHeader.Exists("Host") ? requestHeader["Host"] : "p4fdf5699.dip0.t-ipconnect.de") + requestHeader.requestPath;
-					buffer.Send(responseHeader.toString());
+					response.status = MovedPermanently;
+					response["Connection"]["close"];
+					response["Location"]["https://" + (reqest.Exists("Host") ? reqest["Host"].toString() : "p4fdf5699.dip0.t-ipconnect.de") + reqest.request];
+					buffer.Send(response.toString());
 					return -1;
 				}
 				else
 				{
-					responseHeader["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
-					responseHeader["Connection"] = "keep-alive";
-					if (requestHeader.requestPath == "/")
+					response["Strict-Transport-Security"]["max-age"] = "31536000";
+					response["Strict-Transport-Security"]["includeSubDomains"];
+					response["Connection"] = "keep-alive";
+					if (reqest.request == "/")
 					{
-						responseHeader.status = MovedPermanently;
-						responseHeader["Location"] = "/index.html";
-						buffer.Send(responseHeader.toString());
+						response.status = MovedPermanently;
+						response["Location"] = "/index.html";
+						buffer.Send(response.toString());
 						return -1;
 					}
-					fs::path filepath = buffer.RootPath() / requestHeader.requestPath;
+					fs::path filepath = buffer.RootPath() / reqest.request;
 					if(!is_regular_file(filepath))
 					{
 						throw NotFoundException(u8"Datei oder Seite nicht gefunden");
@@ -272,7 +277,7 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 							throw ServerException(u8"Datei kann nicht ausgeführt werden");
 						}
 						int count = seite(buffer);
-						dlclose(lib);
+						//dlclose(lib);
 						return count;
 					}
 					//else if (ext == ".php")
@@ -284,78 +289,76 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 					{
 						time_t date = fs::file_time_type::clock::to_time_t(fs::last_write_time(filepath));
 						strftime(buf.Data(), buf.Length(), "%a, %d-%b-%G %H:%M:%S GMT", std::gmtime(&date));
-						if (requestHeader.Exists("If-Modified-Since") && requestHeader["If-Modified-Since"] == buf.Data())
+						if (reqest.Exists("If-Modified-Since") && reqest["If-Modified-Since"].toString() == buf.Data())
 						{
-							responseHeader.status = NotModified;
-							buffer.Send(responseHeader.toString());
+							response.status = NotModified;
+							buffer.Send(response.toString());
 							return 0;
 						}
-						responseHeader["Last-Modified"] = buf.Data();
+						response["Last-Modified"] = buf.Data();
 						std::ifstream file = std::ifstream(filepath, std::ios::binary);
 						if (!file.is_open())
 						{
 							throw ServerException(u8"Datei kann nicht geöffnet werden");
 						}
 						uintmax_t filesize = fs::file_size(filepath), a = 0, b = filesize - 1;
-						if (requestHeader.Exists("Range"))
+						if (reqest.Exists("Range"))
 						{
-							std::string & ranges(requestHeader["Range"]);
-							sscanf(ranges.data(), "bytes=%ju-%ju", &a, &b);
+							sscanf(reqest["Range"]["bytes"].data(), "%ju-%ju", &a, &b);
 							if (filesize > (b - a))
 							{
-								responseHeader.status = PartialContent;
-								snprintf(buf.Data(), buf.Length(), "bytes=%ju-%ju/%ju", a, b, filesize);
-								responseHeader["Content-Range"] = buf.Data();
+								response.status = PartialContent;
+								snprintf(buf.Data(), buf.Length(), "%ju-%ju/%ju", a, b, filesize);
+								response["Content-Range"]["bytes"] = buf.Data();
 							}
 							else
 							{
-								responseHeader.status = RangeNotSatisfiable;
-								buffer.Send(responseHeader.toString());
+								response.status = RangeNotSatisfiable;
+								buffer.Send(response.toString());
 								return 0;
 							}
 						}
 						else
 						{
-							responseHeader.status = Ok;
+							response.status = Ok;
 						}
 						if (filepath.extension() == "html")
 						{
-							responseHeader["Content-Type"] = "text/html; charset=utf-8";
+							response["Content-Type"] = "text/html; charset=utf-8";
 						}
 						time(&date);
 						strftime(buf.Data(), buf.Length(), "%a, %d-%b-%G %H:%M:%S GMT", std::gmtime(&date));
-						responseHeader["Date"] = buf.Data();
+						response["Date"] = buf.Data();
 						snprintf(buf.Data(), buf.Length(), "%ju", b - a + 1);
-						responseHeader["Content-Length"] = buf.Data();
-						if (requestHeader.putPath == "herunterladen") responseHeader["Content-Disposition"] = "attachment";
-						responseHeader["Accept-Ranges"] = "bytes";
-						buffer.Send(responseHeader.toString());
-						if (requestHeader.httpMethode != "head")
+						response["Content-Length"] = buf.Data();
+						if (reqest.putValues.toString() == "herunterladen") response["Content-Disposition"] = "attachment";
+						response["Accept-Ranges"] = "bytes";
+						buffer.Send(response.toString());
+						if (reqest.methode != Head)
 						{
 							buffer.Send(file, a, b);
 						}
 					}
 				}
 			}
-			return 0;
 		}
 		catch (const NotFoundException &ex)
 		{
-			responseHeader.status = NotFound;
+			response.status = NotFound;
 			std::string errorpage("<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><title>Nicht gefunden</title></head><body><div><h1>Nicht gefunden: " + std::move(std::string(ex.what())) + "</h1></div></body></html>");
 			snprintf(buf.Data(), buf.Length(), "%zu", errorpage.length());
-			responseHeader["Content-Length"] = buf.Data();
-			buffer.Send(responseHeader.toString());
+			response["Content-Length"] = buf.Data();
+			buffer.Send(response.toString());
 			buffer.Send(errorpage);
-			std::cout << "Not Found Error:" << ex.what() << "\n";
+			std::cout << "Nicht gefunden: " << ex.what() << "\n";
 		}
 		catch (const std::exception& ex)
 		{
-			responseHeader.status = InternalServerError;
+			response.status = InternalServerError;
 			std::string errorpage("<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><title>Interner Server Fehler</title></head><body><div><h1>Interner Server Fehler: " + std::move(std::string(ex.what())) + "</h1></div></body></html>");
 			snprintf(buf.Data(), buf.Length(), "%zu", errorpage.length());
-			responseHeader["Content-Length"] = buf.Data();
-			buffer.Send(responseHeader.toString());
+			response["Content-Length"] = buf.Data();
+			buffer.Send(response.toString());
 			buffer.Send(errorpage);
 			std::cout << "Internal Server Error: " << ex.what() << "\n";
 		}

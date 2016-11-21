@@ -11,47 +11,31 @@
     color: black;
     text-align: left;
     text-decoration: none;
-    font-size: 14px;
+    font-size: 20px;
     cursor: pointer;
     float:left;
+    border-radius: 10px;
 }
 
 .button:hover {
-    background-color: skyblue;
+    background-color: darkcyan;
+    box-shadow: 4px black;
+    box-shadow: 0 12px 16px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.19);
 }
 
 .button1 {
-    width: calc(100% - 20px);
-    height:20px;
+    width: calc(100% - 40px);
+    height:40px;
 }
 
 .button2 {
-    width:20px;
-    height:20px;
+    width:40px;
+    height:40px;
     background-image: url(/img/download-arrow.png);
     background-size: contain;
 }
 
 .button3 {
-    height:20px;
+    height:40px;
     width: 100%;
-}
-
-#header {
-    height: 90px;
-}
-
-#frame {
-    border: none;
-    height: calc(100% - 100px);
-    padding: 0;
-    align-content: center;
-}
-
-#frame iframe {
-    position: absolute;
-    border: none;
-    height: calc(100% - 100px);
-    width: 99%;    
-    padding: 0px; 
 }

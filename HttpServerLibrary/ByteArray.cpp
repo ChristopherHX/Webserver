@@ -9,7 +9,7 @@ ByteArray::ByteArray(ByteArray && obj) : _array(obj._array), _length(obj._length
 
 ByteArray::ByteArray(ByteArray & obj) : _array(new char[obj._length]), _length(obj._length), _owner(true)
 {
-	memcpy(_array, obj._array, _length);
+	memcpy(_array, obj._array, obj._length);
 }
 
 ByteArray::ByteArray(int length) : _array(new char[length]), _length(length), _owner(true)
@@ -44,18 +44,17 @@ const int &ByteArray::Length()
 
 int ByteArray::IndexOf(const char * buffer, int length, int offset, int &mlength)
 {
-	const char *address = nullptr;
 	int i = offset;
 	while (i < _length)
 	{
-		address = (const char *)memchr(_array + i, buffer[0], _length - i);
+		void *address = memchr(_array + i, buffer[0], _length - i);
 		if (address == nullptr) break;
-		mlength = std::min<int>(length, _length + _array - address);
+		mlength = std::min<int>(length, _array + _length - (char*)address);
 		if (mlength > 0 && memcmp(address, buffer, mlength) == 0)
 		{
-			return address - _array;
+			return (char*)address - _array;
 		}
-		i = address + 1 - _array;
+		i = (char*)address + 1 - _array;
 	}
 	mlength = 0;
 	return -1;

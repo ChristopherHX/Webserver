@@ -4,6 +4,7 @@ project (WebServer-cpp)
 add_compile_options(-std=c++14)
 
 if(WIN32)
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS)
 include_directories(C:\\OpenSSL-Win64\\include)
 link_directories(C:\\OpenSSL-Win64\\lib\\VC)
 endif()

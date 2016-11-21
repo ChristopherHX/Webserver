@@ -34,7 +34,7 @@
 //	php_startup
 //};
 //
-//int seite(fs::path & rootfolder, Http::RequestHeader & requestHeader, Http::ResponseHeader& responseHeader, Http::RequestBuffer& buffer, DualByteArray& array)
+//int seite(fs::path & rootfolder, Request & requestHeader, Response& responseHeader, RequestBuffer& buffer, DualByteArray& array)
 //{
 //	sapi_startup(&phpplugin);
 //	
@@ -51,7 +51,7 @@
 //	//responseHeader["Content-Length"] = buf.Data();
 //	//responseHeader["Cache-Control"] = "no-store, must-revalidate";
 //	//buffer.Send(responseHeader.toString());
-//	//if (requestHeader.httpMethode != "HEAD")
+//	//if (requestHeader.methode != "HEAD")
 //	//{
 //	//	buffer.Send(content);
 //	//}
