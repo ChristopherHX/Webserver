@@ -1,5 +1,4 @@
 #include "HttpRequestBuffer.h"
-#include "ByteArray.h"
 #include "HttpServer.h"
 
 #ifdef _WIN32
@@ -9,7 +8,7 @@
 #define SHUT_RDWR SD_BOTH
 #else
 #include <sys/socket.h>
-#include <unistd.h> 
+#include <unistd.h>
 #include <dlfcn.h>
 #include <sys/types.h>
 #include <signal.h>
@@ -20,6 +19,7 @@
 #include <thread>
 #include <atomic>
 #include <iostream>
+#include <condition_variable>
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -27,19 +27,175 @@
 using namespace Http;
 using namespace std::chrono_literals;
 
-RequestBuffer::RequestBuffer(RequestBuffer && obj) : buffer(std::move(obj.buffer)), capacity(obj.capacity), readpos(obj.readpos), writepos(obj.writepos), blocksize(obj.blocksize), nfds(obj.nfds), client(obj.client), ssl(obj.ssl), rootPath(obj.rootPath), iterator(obj.iterator)
+Http::RequestBufferIterator::RequestBufferIterator(pointer begin, pointer end, pointer pos) : begin(begin), end(end), pos(pos), capacity(end - begin), counter(0)
 {
-	
 }
 
-RequestBuffer::RequestBuffer(uintptr_t socket, const int capacity, std::string client, void * ssl, std::experimental::filesystem::path & rootPath) : socket(socket), buffer(capacity), capacity(capacity), readpos(0), writepos(0), blocksize(capacity >> 2), nfds(socket + 1), client(client), ssl(ssl), rootPath(rootPath), iterator(buffer.Data(), capacity)
+Http::RequestBufferIterator::RequestBufferIterator(pointer begin, pointer end) : RequestBufferIterator(begin, end, begin)
 {
-	
+}
+
+Http::RequestBufferIterator::RequestBufferIterator(pointer begin, long long capacity) : RequestBufferIterator(begin, begin + capacity)
+{
+}
+
+RequestBufferIterator::reference RequestBufferIterator::operator*()
+{
+	return *pos;
+}
+
+bool RequestBufferIterator::operator==(const RequestBufferIterator &right)
+{
+	return pos == right.pos && counter == right.counter;
+}
+
+bool Http::RequestBufferIterator::operator!=(const RequestBufferIterator & right)
+{
+	return pos != right.pos || counter != right.counter;
+}
+
+RequestBufferIterator &RequestBufferIterator::operator++()
+{
+	if (++pos == end)
+	{
+		pos = begin;
+		++counter;
+	}
+	return *this;
+}
+
+RequestBufferIterator & RequestBufferIterator::operator--()
+{
+	if (pos == begin)
+	{
+		pos = end - 1;
+		--counter;
+	}
+	else
+	{
+		--pos;
+	}
+	return *this;
+}
+
+RequestBufferIterator RequestBufferIterator::operator++(int)
+{
+	RequestBufferIterator val = *this;
+	++(*this);
+	return val;
+}
+
+RequestBufferIterator RequestBufferIterator::operator--(int)
+{
+	RequestBufferIterator val = *this;
+	--(*this);
+	return val;
+}
+
+
+RequestBufferIterator & RequestBufferIterator::operator+=(long long n)
+{
+	pos += n;
+	while (pos >= end)
+	{
+		pos -= capacity;
+		++counter;
+	}
+	while (pos < begin)
+	{
+		pos += capacity;
+		--counter;
+	}
+	return *this;
+}
+
+RequestBufferIterator & Http::RequestBufferIterator::operator-=(long long n)
+{
+	pos -= n;
+	while (pos >= end)
+	{
+		pos -= capacity;
+		++counter;
+	}
+	while (pos < begin)
+	{
+		pos += capacity;
+		--counter;
+	}
+	return *this;
+}
+
+RequestBufferIterator::reference RequestBufferIterator::operator[](long long index)
+{
+	char * ipos = pos + index;
+	while (ipos >= end)
+	{
+		ipos -= capacity;
+	}
+	while (ipos < begin)
+	{
+		ipos += capacity;
+	}
+	return *ipos;
+}
+
+bool Http::RequestBufferIterator::operator<(const RequestBufferIterator& right)
+{
+	return counter < right.counter || (pos < right.pos && counter == right.counter);
+}
+
+bool Http::RequestBufferIterator::operator>(const RequestBufferIterator& right)
+{
+	return counter > right.counter || (pos > right.pos && counter == right.counter);
+}
+
+bool Http::RequestBufferIterator::operator<=(const RequestBufferIterator& right)
+{
+	return counter < right.counter || (pos <= right.pos && counter == right.counter);
+}
+
+bool Http::RequestBufferIterator::operator>=(const RequestBufferIterator& right)
+{
+	return counter > right.counter || (pos >= right.pos && counter == right.counter);
+}
+
+RequestBufferIterator::pointer Http::RequestBufferIterator::Pointer()
+{
+	return pos;
+}
+
+RequestBufferIterator::difference_type Http::RequestBufferIterator::PointerReadableLength()
+{
+	return end - pos;
+}
+
+RequestBufferIterator::difference_type Http::RequestBufferIterator::PointerReadableLength(const RequestBufferIterator& other)
+{
+	return other.pos <= pos && (counter + 1) == other.counter ? end - pos : (pos < other.pos && counter == other.counter ? other.pos - pos : 0);
+}
+
+RequestBufferIterator::difference_type Http::RequestBufferIterator::PointerWriteableLength(const RequestBufferIterator& other)
+{
+	return other.pos <= pos && counter == other.counter ? end - pos : (pos < other.pos && counter == (other.counter + 1) ? other.pos - pos : 0);
+}
+
+RequestBufferIterator::difference_type Http::RequestBufferIterator::difference(const RequestBufferIterator & left, const RequestBufferIterator & right)
+{
+	return (left.counter - right.counter) * left.capacity + left.pos - right.pos;
+}
+
+RequestBuffer::RequestBuffer(RequestBuffer && other) : buffer(std::move(other.buffer)), capacity(other.capacity), readiter(other.readiter), writeiter(other.writeiter), client(other.client), ssl(other.ssl), rootPath(other.rootPath)
+{
+
+}
+
+Http::RequestBuffer::RequestBuffer(uintptr_t socket, long long capacity, std::string client, void * ssl, const std::experimental::filesystem::path &rootPath) : socket(socket), buffer(capacity), capacity(capacity), readiter(buffer.data(), capacity), writeiter(buffer.data(), capacity), client(client), ssl(ssl), rootPath(rootPath)
+{
 }
 
 RequestBuffer::~RequestBuffer()
 {
-	if(isSecure()) SSL_free((SSL*)ssl);
+	if (isSecure()) SSL_free((SSL*)ssl);
 	shutdown(socket, SHUT_RDWR);
 	closesocket(socket);
 }
@@ -49,192 +205,134 @@ bool RequestBuffer::isSecure()
 	return ssl != nullptr;
 }
 
-void RequestBuffer::RecvData(const std::function<int(RequestBuffer&)> callback)
+long long RequestBuffer::RecvData(std::function<long long(RequestBuffer&)> callback)
 {
-	fd_set rsockets;
-	timeval timeout;
-	FD_ZERO(&rsockets);
-	memset(&timeout, 0, sizeof(timeval));
-	while(true)
+	long long length;
+	fd_set socketfd;
+	timeval timeout{ 0, 0 };
+	FD_ZERO(&socketfd);
+	while (true)
 	{
-		FD_SET(socket, &rsockets);
-		if (select(nfds, &rsockets, nullptr, nullptr, &timeout) == -1) break;
-		if ((FD_ISSET(socket, &rsockets) || (isSecure() && SSL_pending((SSL*)ssl))) && (((writepos - readpos + capacity) % capacity) > blocksize || writepos == readpos))
+		FD_SET(socket, &socketfd);
+		select(socket + 1, &socketfd, nullptr, nullptr, &timeout);
+		length = readiter.PointerWriteableLength(writeiter);
+		if ((FD_ISSET(socket, &socketfd) || (isSecure() && SSL_pending((SSL*)ssl))) && length > 0)
 		{
-			int n = std::min<unsigned int>(blocksize, capacity - readpos);
-			char * offset = buffer.Data() + readpos;
-			if ((n = (isSecure() ? SSL_read((SSL*)ssl, offset, n) : recv(socket, offset, n, 0))) <= 0)
-			{
-				break;
-			}
-			readpos = (readpos + n) % capacity;
+			if ((length = isSecure() ? SSL_read((SSL*)ssl, readiter.Pointer(), length) : recv(socket, readiter.Pointer(), length, 0)) <= 0) return -1;
+			readiter += length;
 		}
-		else if (writepos != readpos)
+		else if (writeiter != readiter)
 		{
-			int n = callback(*this);
-			if(n < 0)
+			if ((length = callback(*this)) < 0)
 			{
-				writepos = (writepos + ~n) % capacity;
-				break;
+				writeiter += ~length;
+				return 0;
 			}
-			writepos = (writepos + n) % capacity;
+			writeiter += length;
 		}
 		else
 		{
-			timeout.tv_sec = 0;
-			timeout.tv_usec = 1000;
+			timeout = { 1, 0 };
 			continue;
 		}
-		memset(&timeout, 0, sizeof(timeval));
+		timeout = { 0, 0 };
 	}
+	return 0;
 }
 
-void RequestBuffer::Free(int count)
+long long RequestBuffer::Free(long long count)
 {
-	writepos = (writepos + count) % capacity;
+	writeiter += count;
+	return count;
 }
 
-int RequestBuffer::Send(const std::string &str)
+long long RequestBuffer::Send(const std::string &str)
 {
 	return isSecure() ? SSL_write((SSL*)ssl, str.data(), str.length()) : send(socket, str.data(), str.length(), 0);
 }
 
-int RequestBuffer::Send(const char* data, int length)
+long long RequestBuffer::Send(const char* data, long long length)
 {
 	return isSecure() ? SSL_write((SSL*)ssl, data, length) : send(socket, data, length, 0);
 }
 
-int RequestBuffer::Send(std::istream &stream, int a, int b)
+long long RequestBuffer::Send(std::istream &stream, long long offset, long long length)
 {
-	int sr = 0, sw = 0, ri = a, wi = a;
-	std::atomic<bool> interrupt(true);
-	std::thread readfileasync([this, &stream, &b, &sr, &sw, &ri, &interrupt]() {
-		stream.seekg(ri, std::ios::beg);
-		while (ri <= b && interrupt.load())
-		{
-			if (((sw - sr + capacity) % capacity) > blocksize || sw == sr)
-			{
-				ri = stream.read(buffer.Data() + (ri % capacity), std::min({blocksize, 1 + b - ri, capacity - (ri % capacity) })).tellg();
-				sr = ri % capacity;
-			}
-			else std::this_thread::sleep_for(1ms);
-		}
-	});
-	fd_set wsockets;
-	timeval timeout;
-	FD_ZERO(&wsockets);
-	memset(&timeout, 0, sizeof(timeval));
-	while (wi <= b)
+	if (readiter != writeiter)
 	{
-		FD_SET(socket, &wsockets);
-		if(select(nfds, nullptr, &wsockets, nullptr, &timeout) == -1) break;
-		if (FD_ISSET(socket, &wsockets) && sw != sr)
-		{
-			int n;
-			const int length = std::min(blocksize, (sw < sr) ? (sr - sw) : (capacity - sw));
-			const char* offset = buffer.Data() + sw;
-			if ((n = (isSecure() ? SSL_write((SSL*)ssl, offset, length) : send(socket, offset, length, 0))) < 0)
+		throw std::runtime_error("readiter != writeiter, RequestBuffer::Send Nicht alles wurde gelesen");
+	}
+	long long read = 0, sent = 0;
+	std::atomic<bool> interrupt(true);
+	/*std::condition_variable cv;
+	std::mutex mtx;*/
+	stream.seekg(offset, std::ios::beg);
+	std::thread readfileasync([this, /*&cv, &mtx,*/ &stream, &length, &read, &interrupt]() {
+		try {
+			long long count;
+			while (read < length && interrupt.load())
 			{
-				break;
-			}
-			else 
-			{
-				wi += n;
-				sw = wi % capacity;
+				if ((count = std::min(length - read, readiter.PointerWriteableLength(writeiter))) > 0)
+				{
+					stream.read(readiter.Pointer(), count);
+					readiter += count;
+					//cv.notify_one();
+					read += count;
+				}
+				//else
+				//{
+				//	std::this_thread::sleep_for(1ms);
+				//	//cv.notify_one();
+				//	//cv.wait(std::unique_lock<std::mutex>(mtx));
+				//}
 			}
 		}
-		else
+		catch (const std::exception &ex)
 		{
-			timeout.tv_sec = 0;
-			timeout.tv_usec = 1000;
-			continue;
+
 		}
-		memset(&timeout, 0, sizeof(timeval));		
+		interrupt.store(false);
+	});
+	long long count;
+	while (sent < length || interrupt.load() || writeiter != readiter)
+	{
+		if ((count = writeiter.PointerReadableLength(readiter)) > 0)
+		{
+			if ((count = isSecure() ? SSL_write((SSL*)ssl, writeiter.Pointer(), count) : send(socket, writeiter.Pointer(), count, 0)) <= 0)
+			{
+				interrupt.store(false);
+				readfileasync.join();
+				throw std::runtime_error("RequestBuffer::Send(std::istream &stream, long long offset, long long length) Verbindungs Fehler");
+			}
+			writeiter += count;
+			//cv.notify_one();
+			sent += count;
+		}
+		//else
+		//{
+		//	std::this_thread::sleep_for(1ms);
+		//	//cv.wait(std::unique_lock<std::mutex>(mtx));
+		//}
 	}
 	interrupt.store(false);
 	readfileasync.join();
-	return wi - a + 1;
+	if (readiter != writeiter) throw std::runtime_error("readiter != writeiter, RequestBuffer::Send Nicht mehr Syncron");
+	return sent;
 }
 
-//void RequestBuffer::Redirect(std::string cmd, std::string args)
-//{
-//#ifdef _WIN32
-//#else
-//	struct { int rfd, wfd; } input, output;
-//	pipe((int*)&input);
-//	pipe((int*)&output);
-//	int pid = fork();
-//	if (pid == -1)
-//	{
-//		close(input.rfd);
-//		close(output.rfd);
-//		close(input.wfd);
-//		close(output.wfd);
-//	}
-//	else if (pid == 0)
-//	{
-//		//dup2(output.wfd, 0);
-//		//dup2(input.rfd, 1);
-//		//close(input.rfd);
-//		close(output.rfd);
-//		close(input.wfd);
-//		//close(output.wfd);
-//		std::cout << (output.wfd, "<h1>Hallo Welt</h1>", 19);
-//		//execl(cmd.data(), cmd.data(), args.data(), (char*)0);
-//		_exit(0);
-//	}
-//	else
-//	{
-//		close(output.wfd);
-//		close(input.rfd);
-//		fd_set phpread;
-//		timeval timeout;
-//		FD_ZERO(&phpread);
-//		memset(&timeout, 0, sizeof(timeval));
-//		ByteArray buf(2048);
-//		while (kill(pid, 0) == 0)
-//		{
-//			FD_SET(output.rfd, &phpread);
-//			FD_SET(socket, &phpread);
-//			if (select(std::max<int>(output.rfd + 1, nfds), &phpread, nullptr, nullptr, &timeout) == -1) break;
-//			if (FD_ISSET(output.rfd, &phpread))
-//			{
-//				Send(buf.Data(), read(output.rfd, buf.Data(), buf.Length()));
-//			}
-//			else if (FD_ISSET(socket, &phpread) || (ssl != nullptr && SSL_pending((SSL*)ssl)))
-//			{
-//				write(input.wfd, buf.Data(), ((ssl == nullptr) ? recv(socket, buf.Data(), buf.Length(), 0) : SSL_read((SSL*)ssl, buf.Data(), buf.Length())));
-//			}
-//			else
-//			{
-//				timeout.tv_sec = 0;
-//				timeout.tv_usec = 1000;
-//				continue;
-//			}
-//			memset(&timeout, 0, sizeof(timeval));
-//		}
-//		close(input.rfd);
-//		close(output.rfd);
-//		close(input.wfd);
-//		close(output.wfd);
-//	}
-//#endif
-//}
-
-const int &RequestBuffer::Capacity()
+const long long &RequestBuffer::Capacity()
 {
 	return capacity;
 }
 
-int RequestBuffer::CopyTo(std::ostream & stream, int length)
+long long RequestBuffer::MoveTo(std::ostream & stream, long long length)
 {
-	int i = 0;
-	RecvData([&i, &stream, &length, blocksize = blocksize](RequestBuffer & buffer) -> int
+	long long i = 0;
+	RecvData([&i, &stream, length, &writeiter = writeiter](RequestBuffer & buffer) -> long long
 	{
-		const int &n = std::min({ buffer.SeqLength(), blocksize, length - i});
-		stream.write(buffer.begin().Pointer(), n);
-		i += n;
-		return i < length ? n : ~n;
+		long long n = std::min(buffer.SeqLength(), length - i);
+		stream.write(writeiter.Pointer(), n);
+		return (i += n) < length ? n : ~n;
 	});
 	return i;
 }
@@ -249,107 +347,41 @@ const std::string &RequestBuffer::Client()
 	return client;
 }
 
-const int RequestBuffer::SeqLength()
+long long RequestBuffer::SeqLength()
 {
-	return (writepos < readpos ? readpos : capacity) - writepos;
+	return writeiter.PointerReadableLength(readiter);
 }
 
-const int RequestBuffer::Length()
+long long RequestBuffer::length()
 {
-	return (readpos - writepos + capacity) % capacity;
+	return readiter - writeiter;
 }
 
-int RequestBuffer::IndexOf(const char * buffer, int length, int offset)
+long long Http::RequestBuffer::indexof(const char * buffer, long long length)
 {
-	RequestBufferIterator begin = this->begin(), end = this->end();
-	RequestBufferIterator res = std::search(begin + offset, end, buffer, buffer + length);
-	return res != end ? (res - begin) : -1;
-	//std::search(this->buffer.Data(), this->buffer.Data() + this->buffer.Length(), buffer, buffer + length);
-	//int seq1 = SeqLength();
-	//bool zarray = seq1 < (offset + 1);s
-	//bool zarrays = writepos >= readpos && readpos > 0;
-	//if (zarray && !zarrays)
-	//{
-	//	RecvData([length = offset + 1](RequestBuffer &buffer) -> int {
-	//		if (length < buffer.Length())
-	//		{
-	//			return -1;
-	//		}
-	//		return 0;
-	//	});
-	//	seq1 = SeqLength();
-	//	zarray = seq1 < (offset + 1);
-	//	zarrays = writepos >= readpos && readpos > 0;
-	//	if (zarray && !zarrays)
-	//	{
-	//		throw ServerException(u8"Puffer Überlauf: Startindex plus Zeichenfolgenlänge ist zu groß");
-	//	}
-	//}
-	//int i = ByteArray(this->buffer.Data(), zarray ? 0 : writepos, zarray ? readpos : seq1).IndexOf(buffer, length, zarray ? (offset - seq1) : offset, mlength);
-	//if (length > mlength && zarrays)
-	//{
-	//	if (mlength > 0)
-	//	{
-	//		if (memcmp(this->buffer.Data(), buffer + mlength, length - mlength) == 0)
-	//		{
-	//			mlength = length;
-	//			return i;
-	//		}
-	//		mlength = 0;
-	//		return -1;
-	//	}
-	//	i = ByteArray(this->buffer.Data(), 0, readpos).IndexOf(buffer, length, 0, mlength);
-	//	return std::max<unsigned int>(i, i + seq1);
-	//}
-	//return i;
+	RequestBufferIterator res = std::search(writeiter, readiter, buffer, buffer + length);
+	return res != readiter ? (res - writeiter) : -1;
 }
 
-int RequestBuffer::IndexOf(const char * string, int offset)
+long long Http::RequestBuffer::indexof(std::string string)
 {
-	return IndexOf(string, strlen(string), offset);
+	RequestBufferIterator res = std::search(writeiter, readiter, string.begin(), string.end());
+	return res != readiter ? (res - writeiter) : -1;
 }
 
-int RequestBuffer::IndexOf(std::string string, int offset)
+long long RequestBuffer::indexof(const char * buffer, long long  length, long long  offset)
 {
-	return IndexOf(string.data(), string.length(), offset);
+	RequestBufferIterator res = std::search(writeiter + offset, readiter, buffer, buffer + length);
+	return res != readiter ? (res - writeiter) : -1;
 }
 
-//ByteArray RequestBuffer::GetRange(int offset, int length)
-//{
-//	const int minlength = offset + length;
-//	if (Length() < minlength)
-//	{
-//		RecvData([minlength](RequestBuffer &buffer) -> int {
-//			if (buffer.Length() >= minlength)
-//			{
-//				return -1;
-//			}
-//			return 0;
-//		});
-//	}
-//	int seq = SeqLength();
-//	if (offset < seq)
-//	{
-//		if (seq < minlength)
-//		{
-//			ByteArray newarray(length);
-//			seq -= offset;
-//			memcpy(newarray.Data(), buffer.Data() + writepos + offset, seq);
-//			memcpy(newarray.Data() + seq, buffer.Data(), length - seq);
-//			return std::move(newarray);
-//		}
-//		else
-//		{
-//			return ByteArray(this->buffer.Data(), writepos + offset, length);
-//		}
-//	}
-//	else
-//	{
-//		return ByteArray(this->buffer.Data(), offset - seq, length);
-//	}
-//}
+long long RequestBuffer::indexof(std::string string, long long  offset)
+{
+	RequestBufferIterator res = std::search(writeiter + offset, readiter, string.begin(), string.end());
+	return res != readiter ? (res - writeiter) : -1;
+}
 
-std::experimental::filesystem::path & RequestBuffer::RootPath()
+const std::experimental::filesystem::path & RequestBuffer::RootPath()
 {
 	return rootPath;
 }
@@ -364,140 +396,38 @@ Response & RequestBuffer::Response()
 	return response;
 }
 
-RequestBufferIterator Http::RequestBuffer::begin()
+const RequestBufferIterator &Http::RequestBuffer::begin()
 {
-	return iterator + writepos;
+	return writeiter;
 }
 
-RequestBufferIterator Http::RequestBuffer::end()
+const RequestBufferIterator &Http::RequestBuffer::end()
 {
-	return iterator + readpos;
+	return readiter;
 }
 
-Http::RequestBufferIterator::RequestBufferIterator(pointer begin, pointer end, pointer pos) : begin(begin), end(end), pos(pos)
-{
-}
-
-Http::RequestBufferIterator::RequestBufferIterator(pointer begin, pointer end) : RequestBufferIterator(begin, end, begin)
-{
-}
-
-Http::RequestBufferIterator::RequestBufferIterator(pointer begin, int capacity) : RequestBufferIterator(begin, begin + capacity)
-{
-}
-
-RequestBufferIterator::reference RequestBufferIterator::operator*()
-{
-	return *pos;
-}
-
-RequestBufferIterator &RequestBufferIterator::operator++()
-{
-	pos = (pos + 1) == end ? begin : (pos + 1);
-	return *this;
-}
-
-bool RequestBufferIterator::operator==(const RequestBufferIterator &right)
-{
-	return pos == right.pos;
-}
-
-bool Http::RequestBufferIterator::operator!=(const RequestBufferIterator & right)
-{
-	return pos != right.pos;
-}
-
-RequestBufferIterator RequestBufferIterator::operator++(int)
-{
-	RequestBufferIterator val = *this;
-	++(*this);
-	return val;
-}
-
-RequestBufferIterator & RequestBufferIterator::operator--()
-{
-	pos = (pos == begin ? end : pos) - 1;
-	return *this;
-}
-
-RequestBufferIterator RequestBufferIterator::operator--(int)
-{
-	RequestBufferIterator val = *this;
-	--(*this);
-	return val;
-}
-
-
-RequestBufferIterator & RequestBufferIterator::operator+=(int n)
-{
-	pos = ((end - begin + (pos - begin + n)) % (end - begin)) + begin;
-	return *this;
-}
-
-RequestBufferIterator & Http::RequestBufferIterator::operator-=(int n)
-{
-	(*this) += -n;
-	return *this;
-}
-
-RequestBufferIterator::reference RequestBufferIterator::operator[](int index)
-{
-	return *(*this + index);
-}
-
-bool Http::RequestBufferIterator::operator<(int right)
-{
-	return *pos < right;
-}
-
-bool Http::RequestBufferIterator::operator>(int right)
-{
-	return *pos > right;
-}
-
-bool Http::RequestBufferIterator::operator<=(int right)
-{
-	return *pos <= right;
-}
-
-bool Http::RequestBufferIterator::operator>=(int right)
-{
-	return *pos >= right;
-}
-
-RequestBufferIterator::pointer Http::RequestBufferIterator::Pointer()
-{
-	return pos;
-}
-
-RequestBufferIterator::difference_type Http::RequestBufferIterator::difference(const RequestBufferIterator & left, const RequestBufferIterator & right)
-{
-	return (left.pos - right.pos + left.end - left.begin) % (left.end - left.begin);
-}
-
-RequestBufferIterator std::operator+(const RequestBufferIterator & left, const int right)
+RequestBufferIterator std::operator+(const RequestBufferIterator & left, long long right)
 {
 	RequestBufferIterator val = left;
 	val += right;
 	return val;
 }
 
-RequestBufferIterator std::operator+(const int left, const RequestBufferIterator & right)
+RequestBufferIterator std::operator+(long long left, const RequestBufferIterator & right)
 {
 	RequestBufferIterator val = right;
 	val += left;
 	return val;
 }
 
-RequestBufferIterator::difference_type std::operator-(const RequestBufferIterator & left, const RequestBufferIterator & right)
+Http::RequestBufferIterator std::operator-(const Http::RequestBufferIterator & left, long long right)
 {
-	return RequestBufferIterator::difference(left,	right);
+	RequestBufferIterator val = left;
+	val -= right;
+	return val;
 }
 
-//template<>
-//void std::swap(Http::RequestBufferIterator & left, Http::RequestBufferIterator & right)
-//{
-//	Http::RequestBufferIterator tmp = left;
-//	left = right;
-//	right = std::move(tmp);
-//}
+RequestBufferIterator::difference_type std::operator-(const RequestBufferIterator & left, const RequestBufferIterator & right)
+{
+	return RequestBufferIterator::difference(left, right);
+}

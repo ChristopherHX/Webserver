@@ -1,15 +1,15 @@
 #include "HttpServer.h"
-
-#include "ByteArray.h"
+#include "Array.h"
 #include "HttpRequestBuffer.h"
-#include "HttpHeader.h"
+#include "Http.h"
+#include "Http2.h"
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "Ws2_32.lib")
 #undef max
-#define SHUT_RDWR SD_BOTH
-#define libext ".dll"
+//#define libext ".dll"
+#define libext ".so"
 #define dlopen(name) LoadLibraryW(name)
 #define dlsym(lib, symbol) GetProcAddress(lib, symbol)
 #define dlclose(lib) FreeLibrary(lib)
@@ -23,9 +23,8 @@
 #include <sys/signalfd.h>
 #include <sys/signal.h>
 #include <dlfcn.h>
-#define closesocket(socket) close(socket)
 #define libext ".so"
-#define dlopen(name) dlopen(name, RTLD_LAZY)
+#define dlopen(name) dlopen(name, RTLD_NOW)
 #define extsymbol "_Z5seiteRN4Http13RequestBufferE"
 #endif
 #include <ctime>
@@ -50,6 +49,149 @@
 using namespace Http;
 namespace fs = std::experimental::filesystem;
 
+#ifndef _WIN32
+#define isnan(a) std::isnan(a)
+#include <php.h>
+#include <php_main.h>
+#include <php_ini.h>
+#include <php_variables.h>
+#include <SAPI.h>
+
+static zend_module_entry php_module;
+
+static int php_startup(sapi_module_struct *sapi_module)
+{
+	std::cout << "php startup\n";
+	if (php_module_startup(sapi_module, &php_module, 1) == 1) {
+		return 1;
+	}
+	return 0;
+}
+
+static size_t
+php_sapi_ub_write(const char *str, size_t str_length)
+{
+	std::cout << "PHP:" << std::string(str, str_length) << "\"," << str_length << "\n";
+	return str_length;
+}
+
+static void
+php_sapi_flush(void *server_context)
+{
+	std::cout << "php flush\n";
+
+	sapi_send_headers();
+	SG(headers_sent) = 1;
+}
+
+static zend_stat_t*
+php_sapi_get_stat(void)
+{
+	std::cout << "php get stat\n";
+
+	zend_stat_t stat;
+	stat.st_gid = 0;
+	return &stat;
+}
+
+static char *
+php_sapi_getenv(char *name, size_t name_len)
+{
+	return (char *)"<Hallo>";
+}
+
+static int
+php_sapi_header_handler(sapi_header_struct *sapi_header, sapi_header_op_enum op, sapi_headers_struct *sapi_headers)
+{
+	std::cout << "header heandler\n";
+
+	switch (op) {
+	case SAPI_HEADER_DELETE:
+
+		return 0;
+	case SAPI_HEADER_DELETE_ALL:
+
+		return 0;
+	case SAPI_HEADER_ADD:
+	case SAPI_HEADER_REPLACE:
+
+		return SAPI_HEADER_ADD;
+	default:
+		return 0;
+	}
+}
+
+static int
+php_sapi_send_headers(sapi_headers_struct *sapi_headers)
+{
+	printf("HTTP/1.1 %d %s", sapi_headers->http_response_code, sapi_headers->http_status_line);
+	return SAPI_HEADER_SENT_SUCCESSFULLY;
+}
+
+static size_t
+php_sapi_read_post(char *buf, size_t count_bytes)
+{
+	std::cout << "php read post\n";
+
+	memset(buf, 0, count_bytes);
+	return count_bytes;
+}
+
+static char *
+php_sapi_read_cookies(void)
+{
+	std::cout << "php read cookie\n";
+
+	return 0;
+}
+
+static void
+php_sapi_register_variables(zval *track_vars_array)
+{
+	std::cout << "php reg var\n";
+
+	char *php_self = (char *)(SG(request_info).request_uri ? SG(request_info).request_uri : "");
+	size_t php_self_len = strlen(php_self);
+	if (sapi_module.input_filter(PARSE_SERVER, "PHP_SELF", &php_self, php_self_len, &php_self_len)) {
+		php_register_variable_safe("PHP_SELF", php_self, php_self_len, track_vars_array);
+	}
+}
+
+static void php_sapi_log_message(char *message)
+{
+	std::cout << message << "\n";
+}
+
+sapi_module_struct phpplugin = {
+	"phppluginwebserver",
+	"PHP Plugin for Webserver alpha",
+	php_startup,
+	php_module_shutdown_wrapper,
+	NULL,
+	NULL,
+	php_sapi_ub_write,			/* unbuffered write */
+	php_sapi_flush,				/* flush */
+	php_sapi_get_stat,			/* get uid */
+	php_sapi_getenv,				/* getenv */
+
+	php_error,					/* error handler */
+
+	php_sapi_header_handler,			/* header handler */
+	php_sapi_send_headers,			/* send headers handler */
+	NULL,						/* send header handler */
+
+	php_sapi_read_post,			/* read POST data */
+	php_sapi_read_cookies,			/* read Cookies */
+
+	php_sapi_register_variables,
+	php_sapi_log_message,			/* Log message */
+	NULL,		/* Request Time */
+	NULL,						/* Child Terminate */
+
+	STANDARD_SAPI_MODULE_PROPERTIES
+};
+#endif
+
 Server::Server()
 {
 	servermainstop.store(false);
@@ -65,11 +207,12 @@ void Server::Starten(const int httpPort, const int httpsPort)
 	if (servermainstop.load())
 		return;
 #ifdef _WIN32
-	WSADATA wsaData;
-	WSAStartup(WINSOCK_VERSION, &wsaData);
+	{
+		WSADATA wsaData;
+		WSAStartup(WINSOCK_VERSION, &wsaData);
+	}
 #endif
 	SSL_CTX* ctx = nullptr;
-
 	fs::path certroot =
 #ifdef _WIN32
 		"../../"
@@ -79,15 +222,12 @@ void Server::Starten(const int httpPort, const int httpsPort)
 		;
 	fs::path publicchain = certroot / "fullchain.pem";
 	fs::path privatekey = certroot / "privkey.pem";
-
 	httpServerSocket = -1;
 	httpsServerSocket = -1;
-
 	if (fs::is_regular_file(publicchain) && fs::is_regular_file(privatekey))
 	{
-		SSL_load_error_strings();
-		OpenSSL_add_ssl_algorithms();
-
+		OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, nullptr);
+		//OPENSSL_init_ssl(0, nullptr);
 		ctx = SSL_CTX_new(TLS_server_method());
 		
 		if (SSL_CTX_use_certificate_chain_file(ctx, publicchain.u8string().data()) < 0) {
@@ -96,8 +236,9 @@ void Server::Starten(const int httpPort, const int httpsPort)
 				if ((*((int*)u)) == 0)
 				{
 					(*((int*)u))++;
-					throw ServerException(std::string(str, len));
+					throw std::runtime_error(std::string(str, len));
 				}
+				return 0;
 			}, &i);
 		}
 
@@ -107,11 +248,20 @@ void Server::Starten(const int httpPort, const int httpsPort)
 				if ((*((int*)u)) == 0)
 				{
 					(*((int*)u))++;
-					throw ServerException(std::string(str, len));
+					throw std::runtime_error(std::string(str, len));
 				}
+				return 0;
 			}, &i);
 			return;
 		}
+		//SSL_CTX_set_alpn_select_cb(ctx, [](SSL * ssl, const unsigned char ** out, unsigned char * outlen, const unsigned char * in, unsigned int inlen, void * args) -> int 
+		//{
+		//	//*out = in;//Http/2
+		//	//*outlen = 3;
+		//	SSL_select_next_proto((unsigned char **)out, outlen, in, inlen, in, inlen);
+		//	return 0;
+		//}, nullptr);
+
 		CreateServerSocket(httpsServerSocket, httpsPort > 0 ? httpsPort : 433);
 	}
 	else
@@ -120,10 +270,10 @@ void Server::Starten(const int httpPort, const int httpsPort)
 		return;
 	}
 
-	CreateServerSocket(httpServerSocket, httpPort > 0 ? httpPort : 80);
+	//CreateServerSocket(httpServerSocket, httpPort > 0 ? httpPort : 80);
 	servermainstop.store(true);
 	servermain = (void*)new std::thread([this, ctx]() {
-		int nfds = std::max(httpServerSocket != -1 ? httpServerSocket : 0, httpsServerSocket != -1 ? httpsServerSocket : 0) + 1;
+		uintptr_t nfds = std::max(httpServerSocket, httpsServerSocket) + 1;
 		fd_set sockets;
 		timeval timeout;
 		sockaddr_in clientAdresse;
@@ -131,37 +281,173 @@ void Server::Starten(const int httpPort, const int httpsPort)
 		FD_ZERO(&sockets);
 		while (servermainstop.load())
 		{
-			timeout.tv_sec = 1;
+			//try {
+			timeout.tv_sec = 5;
 			timeout.tv_usec = 0;
-			if (httpServerSocket != -1)
-			{
-				FD_SET(httpServerSocket, &sockets);
-			}
-			if (httpsServerSocket != -1)
-			{
-				FD_SET(httpsServerSocket, &sockets);
-			}
+			if (httpServerSocket != -1)	FD_SET(httpServerSocket, &sockets);
+			if (httpsServerSocket != -1)FD_SET(httpsServerSocket, &sockets);
 			select(nfds, &sockets, nullptr, nullptr, &timeout);
 			bool Secure = FD_ISSET(httpsServerSocket, &sockets);
-			if(Secure || FD_ISSET(httpServerSocket, &sockets))
+			if (Secure || FD_ISSET(httpServerSocket, &sockets))
 			{
 				uintptr_t clientSocket = accept(Secure ? httpsServerSocket : httpServerSocket, (sockaddr *)&clientAdresse, &clientAdresse_len);
 				if (clientSocket != -1)
 				{
 					SSL *ssl = nullptr;
-					if(Secure)
+					if (Secure)
 					{
 						ssl = SSL_new(ctx);
 						SSL_set_fd(ssl, clientSocket);
 						SSL_accept(ssl);
 					}
-					ByteArray client(clientAdresse_len + 13);
-					snprintf(client.Data(), client.Length(), "http%s://%s:%hu", ssl == nullptr ? "" : "s", inet_ntop(AF_INET, &clientAdresse.sin_addr, ByteArray(clientAdresse_len).Data(), clientAdresse_len), ntohs(clientAdresse.sin_port));
-					std::thread(&Server::processRequest, this, std::unique_ptr<RequestBuffer>(new RequestBuffer(clientSocket, 1 << 14, std::string(client.Data()), ssl, rootfolder))).detach();
+					Utility::Array<char> client(clientAdresse_len + 6);
+					snprintf(client.data(), client.length(), "%s:%hu", inet_ntop(AF_INET, &clientAdresse.sin_addr, Utility::Array<char>(clientAdresse_len).data(), clientAdresse_len), ntohs(clientAdresse.sin_port));
+					std::thread(&Server::processRequest, this, std::unique_ptr<RequestBuffer>(new RequestBuffer(clientSocket, 1 << 14, std::string(client.data()), ssl, rootfolder))).detach();
+					//		Http2::Stream stream(clientSocket, (uintptr_t)ssl);
+					//		Http2::Frame frame;
+					//		while (clientSocket != -1)
+					//		{
+					//			stream >> frame;
+					//			switch (frame.Type)
+					//			{
+					//			case Http2::Frame::Type::HEADERS:
+					//			{
+					//				std::unordered_multimap<std::string, std::string> headerlist;
+					//				Http2::Headers header({frame});
+					//				stream >> header;
+					//				uint32_t hl = frame.length - header.padLength - (header.padLength == 0 ? 0 : 1) - ((frame.flags & 0x20) == 0 ? 0 : 5);
+					//				uint8_t index;
+					//				for (Http2::RotateIterator &pos = stream.begin(), end = pos + hl; pos != end;)
+					//				{
+					//					if ((*pos & 0x80) != 0)
+					//					{
+					//						index = *pos & 0x7F;
+					//						auto & el = Http2::StaticTable[index];
+					//						headerlist.insert(std::pair<std::string, std::string>(el.key, el.value));
+					//						++pos;
+					//					}
+					//					else if ((*pos & 0x40) != 0)
+					//					{
+					//						index = *pos & 0x3F;
+					//						++pos;
+					//						std::string key;
+					//						if (index == 0)
+					//						{
+					//							uint8_t length = *pos & 0x7F;
+					//							key = ((*pos++ & 0x80) != 0) ? Http2::HuffmanDecoder(pos, length) : std::string(pos, pos + length);
+					//							pos += length;
+					//						}
+					//						else
+					//						{
+					//							key = Http2::StaticTable[index].key;
+					//						}
+					//						uint8_t length = *pos & 0x7F;
+					//						headerlist.insert(std::pair<std::string, std::string>(key, ((*pos++ & 0x80) != 0) ? Http2::HuffmanDecoder(pos, length) : std::string(pos, pos + length)));
+					//						pos += length;
+					//					}
+					//					else if ((*pos & 0x20) != 0)
+					//					{
+					//						uint8_t maxsize = *pos & 0x1F;
+					//						++pos;
+
+					//					}
+					//					else if ((*pos & 0x10) != 0)
+					//					{
+					//						index = *pos++ & 0x0F;
+					//						std::string key;
+					//						if (index == 0)
+					//						{
+					//							uint8_t length = *pos & 0x7F;
+					//							key = ((*pos++ & 0x80) != 0) ? Http2::HuffmanDecoder(pos, length) : std::string(pos, pos + length);
+					//							pos += length;
+					//						}
+					//						else
+					//						{
+					//							key = Http2::StaticTable[index].key;
+					//						}
+					//						uint8_t length = *pos & 0x7F;
+					//						headerlist.insert(std::pair<std::string, std::string>(key, ((*pos++ & 0x80) != 0) ? Http2::HuffmanDecoder(pos, length) : std::string(pos, pos + length)));
+					//						pos += length;
+					//					}
+					//					else
+					//					{
+					//						index = *pos & 0x0F;
+					//						++pos;
+					//						std::string key;
+					//						if (index == 0)
+					//						{
+					//							uint8_t length = *pos & 0x7F;
+					//							key = ((*pos++ & 0x80) != 0) ? Http2::HuffmanDecoder(pos, length) : std::string(pos, pos + length);
+					//							pos += length;
+					//						}
+					//						else
+					//						{
+					//							key = Http2::StaticTable[index].key;
+					//						}
+					//						uint8_t length = *pos & 0x7F;
+					//						headerlist.insert(std::pair<std::string, std::string>(key, ((*pos++ & 0x80) != 0) ? Http2::HuffmanDecoder(pos, length) : std::string(pos, pos + length)));
+					//						pos += length;
+					//					}
+					//				}
+					//				Array<unsigned char> buf(4);
+					//				unsigned char * data = buf.data();
+					//				*data++ = 0x80 | 8;
+					//				//*data++ = 0x80 | 7;
+					//				*data++ = 0x40 | 28;
+					//				*data++ = 0x80 | 0x1;
+					//				*data++ = 0x07;
+
+					//				//std::string len(std::to_string(0));
+					//				//*data++ = len.length();
+					//				//memcpy(data, len.data(), len.length());
+					//				//data += len.length();
+					//				Http2::RotateIterator::Ranges ranges;
+					//				ranges.begin = buf.data();
+					//				ranges.capacity = buf.length();
+					//				ranges.end = ranges.begin + ranges.capacity;
+					//				header.headerBlockFragment = Http2::RotateIterator(ranges, ranges.begin);
+					//				frame.length = 4;
+					//				frame.flags = 0x4 | 0x1;
+					//				stream << frame;
+					//				stream << header;
+
+					//				//stream << data;
+					//			}
+					//			break;
+					//			case Http2::Frame::Type::SETTINGS:
+					//			{
+					//				Array<Http2::Setting> settings(frame.length / 6);
+					//				for (int i = 0; i < settings.length(); i++)
+					//				{
+					//					stream >> settings[i];
+					//				}
+					//				frame.length = 0;
+					//				frame.flags = 0x01;
+					//				frame.Type = Http2::Frame::Type::SETTINGS;
+					//				stream << frame;
+					//			}
+					//			break;
+					//			case Http2::Frame::Type::GOAWAY:
+					//			{
+					//				Http::CloseSocket(clientSocket);
+					//			}
+					//			break;
+					//			default:
+					//				stream.Release(frame.length);
+					//			break;
+					//			}
+					//		}
+					//	}
+					//}
+					//			}
+					//			catch (const std::exception &ex)
+					//			{
+					//				
+					//			}
 				}
 			}
 		}
-		if(ctx != nullptr) SSL_CTX_free(ctx);
+		if (ctx != nullptr) SSL_CTX_free(ctx);
 	});
 }
 
@@ -177,34 +463,6 @@ void Server::Stoppen()
 	WSACleanup();
 #endif
 	delete (std::thread*)servermain;
-}
-
-void Server::CreateServerSocket(uintptr_t &serverSocket, int port)
-{
-	serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-	if (serverSocket == -1)
-	{
-		throw ServerException(u8"Kann den Socket nicht erstellen");
-	}
-	sockaddr_in serverAdresse;
-	serverAdresse.sin_family = AF_INET;
-	serverAdresse.sin_addr.s_addr = INADDR_ANY;
-	serverAdresse.sin_port = htons(port);
-	if (bind(serverSocket, (sockaddr *)&serverAdresse, sizeof(serverAdresse)) == -1)
-	{
-		throw ServerException(u8"Kann den Socket nicht Binden");
-	}
-	if (listen(serverSocket, 10) == -1)
-	{
-		throw ServerException(u8"Kann den Socket nicht Abhören!\n");
-	}
-}
-
-void Server::CloseSocket(uintptr_t &serverSocket)
-{
-	shutdown(serverSocket, SHUT_RDWR);
-	closesocket(serverSocket);
-	serverSocket = -1;
 }
 
 void Server::SetRootFolder(const fs::path &path)
@@ -225,15 +483,14 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 #endif
 	RequestArgs status;
 	std::cout << buffer->Client() << " Verbunden\n";
-	buffer->RecvData([&status, &OnRequest = onrequest](RequestBuffer &buffer) -> int
+	buffer->RecvData([&status, &OnRequest = onrequest](RequestBuffer &buffer) -> long long
 	{
 		Response &response = buffer.Response();
 		response.Clear();
 		response["Content-Length"] = "0";
-		ByteArray buf(128);
 		try
 		{
-			int header = buffer.IndexOf("\r\n\r\n", 0);
+			int header = buffer.indexof("\r\n\r\n");
 			if (header > 0)
 			{
 				header += 4;
@@ -243,9 +500,13 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 				if (OnRequest) OnRequest(status);
 				if (!buffer.isSecure())
 				{
+					if (!reqest.Exists("Host"))
+					{
+						throw NotFoundError("Benutze Https/1.1!!!");
+					}
 					response.status = MovedPermanently;
 					response["Connection"]["close"];
-					response["Location"]["https://" + (reqest.Exists("Host") ? reqest["Host"].toString() : "p4fdf5699.dip0.t-ipconnect.de") + reqest.request];
+					response["Location"]["https://" + reqest["Host"].toString() + reqest.request];
 					buffer.Send(response.toString());
 					return -1;
 				}
@@ -256,15 +517,12 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 					response["Connection"] = "keep-alive";
 					if (reqest.request == "/")
 					{
-						response.status = MovedPermanently;
-						response["Location"] = "/index.html";
-						buffer.Send(response.toString());
-						return -1;
+						reqest.request = "/index.html";
 					}
 					fs::path filepath = buffer.RootPath() / reqest.request;
-					if(!is_regular_file(filepath))
+					if(!fs::exists(filepath))
 					{
-						throw NotFoundException(u8"Datei oder Seite nicht gefunden");
+						throw NotFoundError(u8"Datei oder Seite nicht gefunden");
 					}
 					auto ext = filepath.extension();
 					if (ext == libext)
@@ -274,42 +532,64 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 						if (seite == nullptr)
 						{
 							dlclose(lib);
-							throw ServerException(u8"Datei kann nicht ausgeführt werden");
+							throw ServerError(u8"Datei kann nicht ausgeführt werden");
 						}
 						int count = seite(buffer);
 						//dlclose(lib);
 						return count;
 					}
-					//else if (ext == ".php")
-					//{
-					//	//buffer.Redirect("/usr/bin/php", filepath.u8string());
-
-					//}
-					else
+//					else if (ext == ".php")
+//					{
+//#ifdef _WIN32
+//						throw ServerError(u8"PHP Dateien können noch nicht ausgeführt werden");
+//#else
+//						std::cout << "sapi starting\n";
+//						sapi_startup(&phpplugin);
+//						std::cout << "sapi started\n";
+//						php_request_startup();
+//						std::cout << "php starting\n";
+//						zend_file_handle file;
+//						file.type = ZEND_HANDLE_FILENAME;
+//						file.filename = filepath.c_str();
+//						file.free_filename = 0;
+//						file.opened_path = NULL;
+//						std::cout << "php executing\n";
+//						php_execute_script(&file);
+//						sapi_shutdown();
+//						std::cout << "sapi shutdown\n";
+//#endif
+//					}
+					else if(reqest.methode == Get || reqest.methode == Head)
 					{
-						time_t date = fs::file_time_type::clock::to_time_t(fs::last_write_time(filepath));
-						strftime(buf.Data(), buf.Length(), "%a, %d-%b-%G %H:%M:%S GMT", std::gmtime(&date));
-						if (reqest.Exists("If-Modified-Since") && reqest["If-Modified-Since"].toString() == buf.Data())
+						response["Accept-Ranges"] = "bytes";
 						{
-							response.status = NotModified;
-							buffer.Send(response.toString());
-							return 0;
+							Utility::Array<char> buf(128);
+							time_t date = fs::file_time_type::clock::to_time_t(fs::last_write_time(filepath));
+							strftime(buf.data(), buf.length(), "%a, %d-%b-%G %H:%M:%S GMT", std::gmtime(&date));
+							if (reqest.Exists("If-Modified-Since") && reqest["If-Modified-Since"].toString() == buf.data())
+							{
+								response.status = NotModified;
+								buffer.Send(response.toString());
+								return 0;
+							}
+							response["Last-Modified"] = buf.data();
+							time(&date);
+							strftime(buf.data(), buf.length(), "%a, %d-%b-%G %H:%M:%S GMT", std::gmtime(&date));
+							response["Date"] = buf.data();
 						}
-						response["Last-Modified"] = buf.Data();
-						std::ifstream file = std::ifstream(filepath, std::ios::binary);
-						if (!file.is_open())
-						{
-							throw ServerException(u8"Datei kann nicht geöffnet werden");
-						}
-						uintmax_t filesize = fs::file_size(filepath), a = 0, b = filesize - 1;
+						uintmax_t offset = 0, length = fs::file_size(filepath);
 						if (reqest.Exists("Range"))
 						{
-							sscanf(reqest["Range"]["bytes"].data(), "%ju-%ju", &a, &b);
-							if (filesize > (b - a))
+							uintmax_t lpos;
+							std::istringstream iss(reqest["Range"]["bytes"]);
+							iss >> offset;
+							iss.ignore(1, '-');
+							iss >> lpos;
+							if (offset <= lpos && lpos < length)
 							{
+								length = lpos + 1 - offset;
 								response.status = PartialContent;
-								snprintf(buf.Data(), buf.Length(), "%ju-%ju/%ju", a, b, filesize);
-								response["Content-Range"]["bytes"] = buf.Data();
+								response["Content-Range"]["bytes"] = reqest["Range"]["bytes"];
 							}
 							else
 							{
@@ -318,49 +598,57 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 								return 0;
 							}
 						}
-						else
-						{
-							response.status = Ok;
-						}
-						if (filepath.extension() == "html")
-						{
-							response["Content-Type"] = "text/html; charset=utf-8";
-						}
-						time(&date);
-						strftime(buf.Data(), buf.Length(), "%a, %d-%b-%G %H:%M:%S GMT", std::gmtime(&date));
-						response["Date"] = buf.Data();
-						snprintf(buf.Data(), buf.Length(), "%ju", b - a + 1);
-						response["Content-Length"] = buf.Data();
+						else response.status = Ok;
+						response["Content-Length"] = std::to_string(length);
+						if (ext == ".html") response["Content-Type"] = "text/html; charset=utf-8";
+						else if (ext == ".txt") response["Content-Type"] = "text/plain; charset=utf-8";
+						else if (ext == ".css") response["Content-Type"] = "text/css; charset=utf-8";
+						else if (ext == ".js") response["Content-Type"] = "text/javascript; charset=utf-8";
+						else if (ext == ".png") response["Content-Type"] = "image/png";
+						else if (ext == ".jpg") response["Content-Type"] = "image/jpeg";
+						else if (ext == ".svg") response["Content-Type"] = "text/svg; charset=utf-8";
+						else if (ext == ".pdf") response["Content-Type"] = "application/pdf";
+						else if (ext == ".pdf") response["Content-Type"] = "video/mpeg";
+						else if (ext == ".xml") response["Content-Type"] = "text/xml";
+						else if (ext == ".tiff") response["Content-Type"] = "image/tiff";
+						else if (ext == ".fif") response["Content-Type"] = "image/fif";
+						else if (ext == ".ief") response["Content-Type"] = "image/ief";
+						else if (ext == ".gif")	response["Content-Type"] = "image/gif";
+						else response["Content-Type"] = "application/octet-stream";
 						if (reqest.putValues.toString() == "herunterladen") response["Content-Disposition"] = "attachment";
-						response["Accept-Ranges"] = "bytes";
-						buffer.Send(response.toString());
-						if (reqest.methode != Head)
 						{
-							buffer.Send(file, a, b);
+							std::ifstream file = std::ifstream(filepath, std::ios::binary);
+							if (!file.is_open()) throw ServerError(u8"Datei kann nicht geöffnet werden");
+							buffer.Send(response.toString());
+							if (reqest.methode != Head)	buffer.Send(file, offset, length);
 						}
 					}
+					else throw std::runtime_error("Anfrage kann nicht verarbeitet werden: " + reqest.methode);
 				}
 			}
 		}
-		catch (const NotFoundException &ex)
+		catch (const NotFoundError &ex)
 		{
 			response.status = NotFound;
-			std::string errorpage("<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><title>Nicht gefunden</title></head><body><div><h1>Nicht gefunden: " + std::move(std::string(ex.what())) + "</h1></div></body></html>");
-			snprintf(buf.Data(), buf.Length(), "%zu", errorpage.length());
-			response["Content-Length"] = buf.Data();
+			response["Content-Type"] = "text/html; charset=utf-8";
+			std::string errorpage("<!DOCTYPE html><html><head><title>Nicht gefunden</title></head><body><div><h1>Nicht gefunden: " + std::move(std::string(ex.what())) + "</h1></div></body></html>");
+			response["Content-Length"] = std::to_string(errorpage.length());
 			buffer.Send(response.toString());
 			buffer.Send(errorpage);
-			std::cout << "Nicht gefunden: " << ex.what() << "\n";
+		}
+		catch (const ServerError &ex)
+		{
+			response.status = InternalServerError;
+			response["Content-Type"] = "text/html; charset=utf-8";
+			std::string errorpage("<!DOCTYPE html><html><head><title>Interner Server Fehler</title></head><body><div><h1>Interner Server Fehler: " + std::move(std::string(ex.what())) + "</h1></div></body></html>");
+			response["Content-Length"] = std::to_string(errorpage.length());
+			buffer.Send(response.toString());
+			buffer.Send(errorpage);
 		}
 		catch (const std::exception& ex)
 		{
-			response.status = InternalServerError;
-			std::string errorpage("<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><title>Interner Server Fehler</title></head><body><div><h1>Interner Server Fehler: " + std::move(std::string(ex.what())) + "</h1></div></body></html>");
-			snprintf(buf.Data(), buf.Length(), "%zu", errorpage.length());
-			response["Content-Length"] = buf.Data();
-			buffer.Send(response.toString());
-			buffer.Send(errorpage);
-			std::cout << "Internal Server Error: " << ex.what() << "\n";
+			std::cout << ex.what() << "\n";
+			return -1;
 		}
 		return 0;
 	});

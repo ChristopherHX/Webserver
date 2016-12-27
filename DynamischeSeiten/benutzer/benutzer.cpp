@@ -40,15 +40,15 @@
 //	
 //	//ByteArray buf(64);
 //	//std::stringstream contentstream;
-//	//contentstream << "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/></head><body>";
-//	//sscanf(requestHeader["Cookie"].data(), "Sessionid=%s", buf.Data());
-//	//contentstream << "<h1>Willkommen " << (buf.Data() != "" ? buf.Data() : "Melde dich an!!!") << " </h1>";
+//	//contentstream << "<!DOCTYPE html><html><head></head><body>";
+//	//sscanf(requestHeader["Cookie"].data(), "Sessionid=%s", buf.data());
+//	//contentstream << "<h1>Willkommen " << (buf.data() != "" ? buf.data() : "Melde dich an!!!") << " </h1>";
 //	//contentstream << "</body>";
 //	//std::string content(contentstream.str());
 //	//responseHeader.status = Ok;
-//	//snprintf(buf.Data(), buf.Length(), "%zu", content.length());
+//	//snprintf(buf.data(), buf.length(), "%zu", content.length());
 //	//responseHeader["Content-Type"] = "text/html; charset=utf-8";
-//	//responseHeader["Content-Length"] = buf.Data();
+//	//responseHeader["Content-Length"] = buf.data();
 //	//responseHeader["Cache-Control"] = "no-store, must-revalidate";
 //	//buffer.Send(responseHeader.toString());
 //	//if (requestHeader.methode != "HEAD")

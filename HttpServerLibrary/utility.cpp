@@ -1,9 +1,10 @@
+//http://bogomip.net/blog/cpp-url-encoding-and-decoding/
 #include "utility.h"
  
 #include <sstream>
 #include <stdexcept>
 #include <iomanip>
- 
+
 namespace Utility {
     std::string urlEncode(const std::string &toEncode) {
         std::ostringstream out;
@@ -12,7 +13,7 @@ namespace Utility {
             short t = toEncode.at(i);
              
             if(
-                t == 45 ||          // hyphen
+                (t >= 45 && t <= 46) ||       // hyphen-period
                 (t >= 48 && t <= 57) ||       // 0-9
                 (t >= 65 && t <= 90) ||       // A-Z
                 t == 95 ||          // underscore
@@ -47,7 +48,7 @@ namespace Utility {
     std::string charToHex(unsigned char c) {
         short i = c;
          
-        std::stringstream s;
+        std::ostringstream s;
          
         s << "%" << std::setw(2) << std::setfill('0') << std::hex << i;
          

@@ -15,25 +15,19 @@ namespace Http
 		std::function<void(int)> Progress;
 	};
 
-	class ServerException : public std::exception
+	class ServerError : public std::runtime_error
 	{
-	private:
-		const std::string message;
 	public:
-		ServerException(const std::string &message) : message(message)
+		ServerError(const std::string &message) : std::runtime_error(message)
 		{
-		}
-		const char* what() const noexcept override {
-			return message.data();
 		}
 	};
 
-	class NotFoundException : public ServerException
+	class NotFoundError : public std::runtime_error
 	{
 	public:
-		NotFoundException(const std::string &message) : ServerException(message)
+		NotFoundError(const std::string &message) : std::runtime_error(message)
 		{
-
 		}
 	};
 
@@ -51,8 +45,6 @@ namespace Http
 		~Server();
 		void Starten(const int httpPort, const int httpsPort);
 		void Stoppen();
-		void CreateServerSocket(uintptr_t & serverSocket, int port);
-		void CloseSocket(uintptr_t & serverSocket);
 		void SetRootFolder(const std::experimental::filesystem::path & path);
 		void OnRequest(std::function<void(RequestArgs&)> onrequest);
 	};

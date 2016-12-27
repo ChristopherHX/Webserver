@@ -1,6 +1,6 @@
 #pragma once
-#include "ByteArray.h"
-#include "HttpHeader.h"
+#include "Http.h"
+#include "Array.h"
 
 #include <cstdint>
 #include <functional>
@@ -13,31 +13,35 @@
 
 namespace Http
 {
-	class RequestBufferIterator : public std::iterator<std::random_access_iterator_tag, char, int, char*, char&>
+	class RequestBufferIterator : public std::iterator<std::random_access_iterator_tag, char, long long, char*, char&>
 	{
 	private:
 		pointer begin;
 		pointer end;
 		pointer pos;
+		long long capacity, counter;
 	public:
 		RequestBufferIterator(pointer begin, pointer end, pointer pos);
 		RequestBufferIterator(pointer begin, pointer end);
-		RequestBufferIterator(pointer begin, int capacity);
+		RequestBufferIterator(pointer begin, long long capacity);
 		reference operator*();
-		RequestBufferIterator & operator++();
 		bool operator==(const RequestBufferIterator & right);
 		bool operator!=(const RequestBufferIterator & right);
+		RequestBufferIterator & operator++();
+		RequestBufferIterator & operator--();
 		RequestBufferIterator operator++(int);
 		RequestBufferIterator operator--(int);
-		RequestBufferIterator & operator--();
-		RequestBufferIterator & operator+=(int right);
-		RequestBufferIterator & operator-=(int right);
-		reference operator[](int index);
-		bool operator<(int right);
-		bool operator>(int right);
-		bool operator<=(int right);
-		bool operator>=(int right);
+		RequestBufferIterator & operator+=(long long right);
+		RequestBufferIterator & operator-=(long long right);
+		bool operator<(const RequestBufferIterator & right);
+		bool operator>(const RequestBufferIterator & right);
+		bool operator<=(const RequestBufferIterator & right);
+		bool operator>=(const RequestBufferIterator & right);
+		reference operator[](long long index);
 		pointer Pointer();
+		RequestBufferIterator::difference_type PointerReadableLength();
+		RequestBufferIterator::difference_type PointerReadableLength(const RequestBufferIterator & other);
+		RequestBufferIterator::difference_type PointerWriteableLength(const RequestBufferIterator & other);
 		static RequestBufferIterator::difference_type difference(const RequestBufferIterator & left, const RequestBufferIterator & right);
 	};
 
@@ -45,50 +49,46 @@ namespace Http
 	{
 	private:
 		uintptr_t socket;
-		ByteArray buffer;
-		const int capacity;
-		const int blocksize;
-		const uintptr_t nfds;
-		int readpos, writepos;
+		Utility::Array<char> buffer;
+		long long capacity;
 		std::string client;
 		void * ssl;
-		std::experimental::filesystem::path & rootPath;
+		const std::experimental::filesystem::path & rootPath;
 		Request request;
 		Response response;
-		RequestBufferIterator iterator;
+		RequestBufferIterator readiter, writeiter;
 	public:
-		RequestBuffer(RequestBuffer&&);
+		RequestBuffer(uintptr_t socket, long long capacity, std::string client, void * ssl, const std::experimental::filesystem::path &rootPath);
+		RequestBuffer(RequestBuffer && other);
 		RequestBuffer(RequestBuffer&) = delete;
-		RequestBuffer(uintptr_t socket, const int capacity, const std::string client, void * ssl, std::experimental::filesystem::path & rootPath);
 		~RequestBuffer();
 		bool isSecure();
-		void RecvData(const std::function<int(RequestBuffer&)> callback);
-		void Free(int count);
-		int Send(const char* data, int length);
-		int Send(const std::string &str);
-		int Send(std::istream &stream, int offset, int length);
-		const int &Capacity();
-		int CopyTo(std::ostream &stream, int length);
+		long long RecvData(std::function<long long(RequestBuffer&)> callback);
+		long long Free(long long count);
+		long long Send(const char* data, long long length);
+		long long Send(const std::string &str);
+		long long Send(std::istream &stream, long long offset, long long length);
+		const long long &Capacity();
+		long long MoveTo(std::ostream &stream, long long length);
 		const uintptr_t &GetSocket();
 		const std::string &Client();
-		const int SeqLength();
-		const int Length();
-		int IndexOf(const char * buffer, int length, int offset);
-		int IndexOf(const char * string, int offset);
-		int IndexOf(std::string string, int offset);
-		//ByteArray GetRange(int offset, int length);
-		std::experimental::filesystem::path &RootPath();
+		long long SeqLength();
+		long long length();
+		long long indexof(const char * buffer, long long length);
+		long long indexof(std::string string);
+		long long indexof(const char * buffer, long long length, long long offset);
+		long long indexof(std::string string, long long offset);
+		const std::experimental::filesystem::path &RootPath();
 		Request &Request();
 		Response &Response();
-		RequestBufferIterator begin();
-		RequestBufferIterator end();
+		const RequestBufferIterator &begin();
+		const RequestBufferIterator &end();
 	};
 }
 
 namespace std {
-	Http::RequestBufferIterator operator+(const Http::RequestBufferIterator &left, const int right);
-	Http::RequestBufferIterator operator+(const int left, const Http::RequestBufferIterator &right);
+	Http::RequestBufferIterator operator+(const Http::RequestBufferIterator &left, long long right);
+	Http::RequestBufferIterator operator+(long long left, const Http::RequestBufferIterator &right);
+	Http::RequestBufferIterator operator-(const Http::RequestBufferIterator &left, long long right);
 	Http::RequestBufferIterator::difference_type operator-(const Http::RequestBufferIterator & left, const Http::RequestBufferIterator & right);
-	//template<>
-	//void swap<Http::RequestBufferIterator &, void>(Http::RequestBufferIterator & left, Http::RequestBufferIterator & right);
 }

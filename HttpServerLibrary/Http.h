@@ -7,7 +7,7 @@
 class String
 {
 public:
-	static std::string &Replace(std::string &&str, const char * search, const char * replace);
+	static std::string Replace(const std::string &str, const char * search, const char * replace);
 };
 
 namespace Http
@@ -26,8 +26,13 @@ namespace Http
 	const std::string Head("HEAD");
 	const std::string Post("POST");
 
+	void CreateServerSocket(uintptr_t & serverSocket, int port);
+	void CloseSocket(uintptr_t & socket);
+
 	class Values
 	{
+	private:
+		std::unordered_map<std::string, std::string> values;
 	public:
 		Values();
 		Values(const std::string &values);
@@ -35,12 +40,12 @@ namespace Http
 		std::string &operator[](const std::string &key);
 		bool Exists(std::string key);
 		std::string toString();
-	private:
-		std::unordered_map<std::string, std::string> values;
 	};
 
 	class Parameter
 	{
+	private:
+		std::unordered_map<std::string, Values> parameter;
 	public:
 		Parameter();
 		Parameter(std::string paramstr);
@@ -48,8 +53,6 @@ namespace Http
 		bool Exists(std::string key);
 		void Clear();
 		std::string toString();
-	private:
-		std::unordered_map<std::string, Values> parameter;
 	};
 
 	class Request : public Parameter
@@ -61,6 +64,7 @@ namespace Http
 		std::string methode;
 		std::string request;
 		Values putValues;
+		double version;
 	};
 
 	class Response : public Parameter
