@@ -49,7 +49,7 @@ bool compare_nocase(const std::string& first, const std::string& second)
 
 int seite(RequestBuffer& buffer)
 {
-	auto& requestHeader = buffer.Request();
+	auto& requestHeader = buffer.request();
 	if (requestHeader.methode == Get || requestHeader.methode == Head)
 	{
 		std::string content;
@@ -106,7 +106,7 @@ int seite(RequestBuffer& buffer)
 				<button type=\"submit\">Anmelden</button>\
 			</form></body></html>";
 		}
-		auto & responseHeader = buffer.Response();
+		auto & responseHeader = buffer.response();
 		responseHeader.status = Ok;
 		responseHeader["Content-Type"] = "text/html; charset=utf-8";
 		responseHeader["Content-Length"] = std::to_string(content.length());
@@ -164,7 +164,7 @@ int seite(RequestBuffer& buffer)
 						{
 							args.fileStream.close();
 						}
-						auto &responseHeader = buffer.Response();
+						auto &responseHeader = buffer.response();
 						responseHeader.status = Ok;
 						buffer.Send(responseHeader.toString());
 						return ~(fileHeader + 4);
@@ -188,7 +188,7 @@ int seite(RequestBuffer& buffer)
 			}
 			buf[32] = 0;
 			std::string sessionid(buf.data());
-			auto &responseHeader = buffer.Response();
+			auto &responseHeader = buffer.response();
 			responseHeader["Set-Cookie"]["Sessionid"] = sessionid;
 			responseHeader["Set-Cookie"]["HttpOnly"];
 			responseHeader["Set-Cookie"]["Secure"];

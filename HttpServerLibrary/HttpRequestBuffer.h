@@ -54,8 +54,8 @@ namespace Http
 		std::string client;
 		void * ssl;
 		const std::experimental::filesystem::path & rootPath;
-		Request request;
-		Response response;
+		Request _request;
+		Response _response;
 		RequestBufferIterator readiter, writeiter;
 	public:
 		RequestBuffer(uintptr_t socket, long long capacity, std::string client, void * ssl, const std::experimental::filesystem::path &rootPath);
@@ -79,8 +79,8 @@ namespace Http
 		long long indexof(const char * buffer, long long length, long long offset);
 		long long indexof(std::string string, long long offset);
 		const std::experimental::filesystem::path &RootPath();
-		Request &Request();
-		Response &Response();
+		Request &request();
+		Response &response();
 		const RequestBufferIterator &begin();
 		const RequestBufferIterator &end();
 	};

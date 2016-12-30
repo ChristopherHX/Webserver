@@ -15,7 +15,7 @@ include_directories(/mnt/c/Users/Christopher/php7.0-armhf/include/php)
 include_directories(/mnt/c/Users/Christopher/php7.0-armhf/include/php/main)
 include_directories(/mnt/c/Users/Christopher/php7.0-armhf/include/php/TSRM)
 include_directories(/mnt/c/Users/Christopher/php7.0-armhf/include/php/Zend)
-link_directories(/mnt/c/Users/Christopher/php7.0-armhf/lib)
+#link_directories(/mnt/c/Users/Christopher/php7.0-armhf/lib)
 endif()
 
 include_directories("${PROJECT_SOURCE_DIR}/HttpServerLibrary")
@@ -33,3 +33,8 @@ target_link_libraries (WebServer HttpServerLibrary stdc++ stdc++fs pthread dl ss
 endif()
 
 install (TARGETS WebServer DESTINATION bin)
+
+if(UNIX)
+add_executable(PHPTest phptest.cpp)
+target_link_libraries (PHPTest stdc++ php7)
+endif()

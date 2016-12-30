@@ -2,6 +2,7 @@
 #include <string>
 #include <memory>
 #include <algorithm>
+#include <cstring>
 
 namespace Utility {
 
@@ -44,11 +45,11 @@ namespace Utility {
 	class RotateIterator : public std::iterator<std::random_access_iterator_tag, Type, long long, Type*, Type&>
 	{
 	private:
-		pointer pos;
+		Type* pos;
 		long long counter;
 		Ranges<Type> * ranges;
 	public:
-		RotateIterator(Ranges<Type> &ranges, pointer pos);
+		RotateIterator(Ranges<Type> &ranges, Type* pos);
 		RotateIterator(Ranges<Type> &ranges);
 		RotateIterator();
 		Type& operator*();
@@ -153,15 +154,15 @@ namespace Utility {
 	template<class Type>
 	inline std::size_t Array<Type>::indexof(const Type * buffer, std::size_t length, std::size_t offset)
 	{
-		Type * res = std::search(_array + offset, _array + _length, buffer, buffer + length);
-		return res != (_array + _length) ? (res - _array) : -1;
+		Type * res = std::search(ranges.begin + offset, ranges.begin + ranges.length, buffer, buffer + length);
+		return res != (ranges.begin + ranges.length) ? (res - ranges.begin) : -1;
 	}
 
 	template<class Type>
 	inline std::size_t Array<Type>::indexof(std::string string, std::size_t offset)
 	{
-		Type * res = std::search(_array + offset, _array + _length, string.begin(), string.end());
-		return res != (_array + _length) ? (res - _array) : -1;
+		Type * res = std::search(ranges.begin + offset, ranges.begin + ranges.length, string.begin(), string.end());
+		return res != (ranges.begin + ranges.length) ? (res - ranges.begin) : -1;
 	}
 
 	template<class Type>
@@ -198,7 +199,7 @@ namespace Utility {
 	}
 
 	template<class Type>
-	RotateIterator<Type>::RotateIterator(Ranges<Type> & ranges, pointer pos) : ranges(&ranges), pos(pos), counter(0)
+	RotateIterator<Type>::RotateIterator(Ranges<Type> & ranges, Type* pos) : ranges(&ranges), pos(pos), counter(0)
 	{
 
 	}

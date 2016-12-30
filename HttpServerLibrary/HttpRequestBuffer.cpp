@@ -386,14 +386,14 @@ const std::experimental::filesystem::path & RequestBuffer::RootPath()
 	return rootPath;
 }
 
-Request & RequestBuffer::Request()
+Request & RequestBuffer::request()
 {
-	return request;
+	return _request;
 }
 
-Response & RequestBuffer::Response()
+Response & RequestBuffer::response()
 {
-	return response;
+	return _response;
 }
 
 const RequestBufferIterator &Http::RequestBuffer::begin()

@@ -329,13 +329,28 @@ std::pair<std::string, std::string> Http2::HPack::StaticTable[] = {
 	{ "www-authenticate" , "" }
 };
 
-Http2::HPack::Encoder::Encoder()
+//Http2::HPack::Coder::Coder()
+//{
+//	dynamictable = Utility::Array<std::pair<std::string, std::string>>(100);
+//	ClearDynamicTable();
+//}
+//
+//void Http2::HPack::Coder::ClearDynamicTable()
+//{
+//	dynamictableend = dynamictable.begin();
+//}
+
+Http2::HPack::Encoder::Encoder() : dynamictable(50) // : Coder()
 {
-	dynamictable = Utility::Array<std::pair<std::string, std::string>>(100);
 	ClearDynamicTable();
 }
 
 void Http2::HPack::Encoder::ClearDynamicTable()
+{
+	dynamictableend = dynamictable.begin();
+}
+
+void Http2::HPack::Decoder::ClearDynamicTable()
 {
 	dynamictableend = dynamictable.begin();
 }
@@ -442,15 +457,9 @@ Utility::RotateIterator<uint8_t> Http2::HPack::Encoder::StringH(Utility::RotateI
 	return std::copy(begin, end, Integer(pos, end - begin, 7));
 }
 
-Http2::HPack::Decoder::Decoder()
+Http2::HPack::Decoder::Decoder() : dynamictable(50)// : Coder()
 {
-	dynamictable = Utility::Array<std::pair<std::string, std::string>>(100);
 	ClearDynamicTable();
-}
-
-void Http2::HPack::Decoder::ClearDynamicTable()
-{
-	dynamictableend = dynamictable.begin();
 }
 
 Utility::RotateIterator<uint8_t> Http2::HPack::Decoder::Headerblock(Utility::RotateIterator<uint8_t> pos, Utility::RotateIterator<uint8_t> end, Utility::RotateIterator<std::pair<std::string, std::string>> &headerlistend)

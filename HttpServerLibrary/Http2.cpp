@@ -11,6 +11,20 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#ifdef _WIN32
+#define dlopen(name) LoadLibraryExW(name, NULL, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)
+#define dlsym(lib, symbol) GetProcAddress((HMODULE)lib, symbol)
+#define dlclose(lib) FreeLibrary((HMODULE)lib)
+#define initsymbol "?init@@YAXXZ"
+#define mainsymbol "?requesthandler@@YAXAEAUConnection@Http2@@AEAUStream@2@AEBVpath@v1@filesystem@experimental@std@@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@8@3@Z"
+#define deinitsymbol "?deinit@@YAXXZ"
+#else
+#define dlopen(name) dlopen(name,0);
+#define initsymbol "?"
+#define mainsymbol "?"
+#define deinitsymbol "?"
+#endif
+
 using namespace Http2;
 using namespace Http2::HPack;
 using namespace Utility;
@@ -22,6 +36,7 @@ std::pair<fs::path, std::string> Http2::MimeTypeTable[] = {
 	{ ".css" , "text/css; charset=utf-8" },
 	{ ".js", "text/javascript; charset=utf-8" },
 	{ ".xml" , "text/xml; charset=utf-8" },
+	{ ".json" , "text/json; charset=utf-8" },
 	{ ".svg", "text/svg; charset=utf-8" },
 	{ ".txt" , "text/plain; charset=utf-8" },
 	{ ".png" , "image/png" },
@@ -40,198 +55,17 @@ bool StreamSearch(const Stream & stream, uint32_t streamIndentifier)
 	return stream.streamIndentifier == streamIndentifier;
 }
 
-//std::string Http2::HuffmanEncoder(std::string source)
-//{
-//	std::ostringstream strs;
-//	long long  i = 0, blength = source.length() << 3;
-//	uint32_t buf = 0;
-//	for (auto&ch : source)
-//	{
-//		HuffmanEntry & res = StaticHuffmanTable[ch];
-//		buf |= res.sequenz << (32 - res.length - (i % 8));
-//		for (int j = 0; j < (((i % 8) + res.length) >> 3); ++j)
-//		{
-//			strs.put((char)(buf >> 24));
-//			buf <<= 8;
-//		}
-//		i += res.length;
-//	}
-//	if ((i % 8) > 0)
-//	{
-//		buf |= (uint32_t)(std::numeric_limits<int32_t>::min() >> (7 - (i % 8))) >> (i % 8);
-//		strs.put((char)(buf >> 24));
-//	}
-//	return strs.str();
-//}
-
-//Stream::Stream(uintptr_t csocket, uintptr_t cssl) : _array(256), ranges({ _array.data(), _array.data() + _array.length(), _array.length()}), inputiterator(ranges), outputiterator(ranges), running(true), csocket(csocket), cssl(cssl)
-//{
-//	receiver = (void*)new std::thread([this]() {
-//		long long length;
-//		fd_set socketfd;
-//		timeval timeout{ 0, 0 };
-//		FD_ZERO(&socketfd);
-//		while (running)
-//		{
-//			FD_SET(this->csocket, &socketfd);
-//			select(this->csocket + 1, &socketfd, nullptr, nullptr, &timeout);
-//			length = inputiterator.PointerWriteableLength(outputiterator);
-//			if ((FD_ISSET(this->csocket, &socketfd) || SSL_pending(this->cssl)) && length > 0)
-//			{
-//				if ((length = SSL_read(this->cssl, inputiterator.Pointer(), length)) <= 0) break;
-//				inputiterator += length;
-//				timeout = { 0, 0 };
-//			}
-//			else
-//			{
-//				timeout = { 0, 1 };
-//			}
-//		}
-//		running = false;
-//	});
-//	const char http2preface[] = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
-//	RotateIterator end, res;
-//	do {
-//		end = inputiterator;
-//		res = std::search(outputiterator, end, http2preface, http2preface + 24);
-//		if (res == end && !running) throw std::runtime_error("Stream Error");
-//	} while (res == end);
-//	outputiterator = res + 24;
-//}
-//
-//Http2::Stream::~Stream()
-//{
-//	running = false;
-//	(*(std::thread*)receiver).join();
-//	SSL_free(cssl);
-//	delete (std::thread*)receiver;
-//}
-//
-//Stream & Http2::Stream::operator >> (Frame & frame)
-//{
-//	while(outputiterator.PointerReadableLength(inputiterator) < 9 && running) std::this_thread::sleep_for(1ms);
-//	if (!running) throw std::runtime_error("Can't get frame");
-//	frame = { (uint32_t)((outputiterator[0] << 0xff | outputiterator[1] << 0xf | outputiterator[2]) & 0x0fff), (Frame::Type)outputiterator[3], (Frame::Flags)outputiterator[4], (uint32_t)((outputiterator[5] << 0xfff | outputiterator[6] << 0xff | outputiterator[7] << 0xf | outputiterator[8]))};
-//	outputiterator += 9;
-//	return *this;
-//}
-//
-//Stream & Http2::Stream::operator<<(const Frame & frame)
-//{
-//	Array<unsigned char> frameb(9);
-//	unsigned char * data = frameb.data();
-//	memcpy(data, &frame.length + 1, 3);
-//	data[3] = frame.Type;
-//	data[4] = frame.flags;
-//	*(uint32_t*)(data + 5) = (frame.r << 0x7fff) | (frame.streamIndentifier & 0x7fff);
-//	SSL_write(cssl, data, 9);
-//	return *this;
-//}
-//
-//Stream & Http2::Stream::operator >> (Headers &headers)
-//{
-//	*this >> (Frame)headers;
-//	headers.headerBlockFragment = outputiterator;
-//	return *this;
-//}
-//
-//Stream & Http2::Stream::operator >> (HeadersPadded &headers)
-//{
-//	headers.padLength = (headers.frame.flags & 0x8) != 0 ? (*outputiterator++) : 0;
-//	if ((headers.frame.flags & 0x20) != 0)
-//	{
-//		headers.e = (*outputiterator >> 7) & 1;
-//		headers.streamDependency = (uint32_t)(((outputiterator[0] << 24) | (outputiterator[1] << 16) | (outputiterator[2] << 8) | outputiterator[3]) & std::numeric_limits<int32_t>::max());
-//		headers.weight = *(outputiterator += 4);
-//		++outputiterator;
-//	}
-//	else
-//	{
-//		headers.e = 0;
-//		headers.streamDependency = 0;
-//		headers.weight = 0;
-//	}
-//	return *this;
-//}
-//
-//Stream & Http2::Stream::operator<<(const Headers & headers)
-//{
-//	Array<unsigned char> headerb(headers.frame.length);
-//	unsigned char * data = headerb.data();
-//	long long n = 0;
-//	if ((headers.frame.flags & 0x8) != 0)
-//	{
-//		data[n++] = headers.padLength;
-//	}
-//	if ((headers.frame.flags & 0x20) != 0)
-//	{
-//		*(uint32_t*)(data + n) = ((headers.e & 1) << 31) | headers.streamDependency;
-//		n += sizeof(uint32_t);
-//		data[n++] = headers.weight;
-//	}
-//	auto hblen = (headers.frame.length - ((headers.frame.flags & 0x8) != 0 ? (headers.padLength + 1) : 0) - ((headers.frame.flags & 0x20) == 0 ? 0 : 5));
-//	std::copy(headers.headerBlockFragment, headers.headerBlockFragment + hblen, data + n);
-//	n += hblen;
-//	if ((headers.frame.flags & 0x8) != 0)
-//	{
-//		std::copy(headers.padding, headers.headerBlockFragment + headers.padLength, data + n);
-//		n += headers.padLength;
-//	}
-//	SSL_write(cssl, data, n);
-//	return *this;
-//}
-//
-//Stream & Http2::Stream::operator >> (Setting & setting)
-//{
-//	setting.id = (Setting::Id)(outputiterator[0] << 8 | outputiterator[1]);
-//	setting.value = (uint32_t)((outputiterator[2] << 24) | (outputiterator[3] << 16) | (outputiterator[4] << 8) | outputiterator[5]);
-//	outputiterator += 6;
-//	return *this;
-//}
-//
-//Stream & Http2::Stream::operator<<(const Setting & setting)
-//{
-//	Array<unsigned char> settingb(6);
-//	unsigned char * data = settingb.data();
-//	*(uint32_t*)data = setting.id;
-//	*(uint32_t*)(data + 2) = setting.value;
-//	SSL_write(cssl, data, 6);
-//	return *this;
-//}
-//
-//void Http2::Stream::Release(long long count)
-//{
-//	outputiterator += count;
-//}
-//
-//RotateIterator &Http2::Stream::begin()
-//{
-//	return outputiterator;
-//}
-//
-//RotateIterator Http2::Stream::end()
-//{
-//	return inputiterator;
-//}
-
-Server::Server() : conhandler(std::thread::hardware_concurrency()), running(true), connections(20), connectionsbegin(connections.begin()), connectionsend(connections.begin())
+Http2::Server::Server(const std::experimental::filesystem::path & certroot, const std::experimental::filesystem::path & rootpath) : conhandler(/*std::thread::hardware_concurrency()*/1), running(true), connections(20), rootpath(rootpath), libs(10)
 {
-
-}
-
-void Server::Start(const fs::path &certroot)
-{
+	connectionsend = connectionsbegin = connections.begin();
+	libsend = libs.begin();
 #ifdef _WIN32
 	{
 		WSADATA wsaData;
 		WSAStartup(WINSOCK_VERSION, &wsaData);
 	}
 #endif
-	{		 //=
-			//"./"
-
-			//"/etc/letsencrypt/live/p4fdf5699.dip0.t-ipconnect.de/"
-		;
+	{
 		fs::path publicchain = certroot / "fullchain.pem";
 		fs::path privatekey = certroot / "privkey.pem";
 		if (!fs::is_regular_file(publicchain) || !fs::is_regular_file(privatekey))
@@ -239,7 +73,7 @@ void Server::Start(const fs::path &certroot)
 			throw std::runtime_error("Zertifikat(e) nicht gefunden\nServer kann nicht gestartet werden");
 		}
 		OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, nullptr);
-		sslctx = SSL_CTX_new(TLSv1_2_server_method());
+		sslctx = SSL_CTX_new(TLS_server_method());
 		if (SSL_CTX_use_certificate_chain_file(sslctx, publicchain.u8string().data()) < 0) {
 			throw std::runtime_error(u8"Der Öffentlicher Schlüssel konnte nicht gelesen werden");
 		}
@@ -257,7 +91,7 @@ void Server::Start(const fs::path &certroot)
 		throw std::runtime_error(u8"Der Server Socket konnte nicht erstellt werden");
 	}
 	{
-		DWORD val = 0;
+		uint32_t val = 0;
 		if (setsockopt(ssocket, IPPROTO_IPV6, IPV6_V6ONLY, (const char*)&val, sizeof(val)) != 0)
 		{
 			throw std::runtime_error(u8"IPV6_V6ONLY konnte nicht deaktiviert werden");
@@ -307,17 +141,55 @@ Server::~Server()
 		}
 	}
 	connectionsbegin = connectionsend;
+	for (auto lib = libs.begin(); lib != libsend; ++lib)
+	{
+		void* handle = std::get<1>(*lib);
+		if (handle != 0)
+		{
+			auto deinit = (void(*)())dlsym(handle, deinitsymbol);
+			if (deinit != nullptr) deinit();
+			dlclose(handle);
+		}
+	}
+	libsend = libs.begin();
+}
+
+bool ValidFile(fs::path &filepath, std::string &uri)
+{
+	if (fs::is_regular_file(filepath))
+	{
+		return true;
+	}
+	else
+	{
+		fs::path pathbuilder;
+		for(auto pos = filepath.begin(), end = filepath.end(); pos != end; ++pos)
+		{
+			if (fs::is_regular_file(pathbuilder /= *pos))
+			{
+				uri = "";
+				while (++pos != end)
+				{
+					uri += "/" + pos->u8string();
+				}
+				filepath = pathbuilder;
+				return true;
+			}
+		}
+		return false;
+	}
 }
 
 void Server::connectionshandler()
 {
 	timeval timeout = { 0,0 }, poll = { 0,0 };
+	size_t nfds = ssocket + 1;
 	while (running)
 	{
 		{
 			fd_set tmp = sockets;
-			select(1024, &tmp, nullptr, nullptr, &timeout);
-			active = std::move(tmp);
+			select(nfds, &tmp, nullptr, nullptr, &timeout);
+			active = tmp;
 		}
 		if (FD_ISSET(ssocket, &active) && connectionsend->rmtx.try_lock())
 		{
@@ -339,6 +211,11 @@ void Server::connectionshandler()
 				con.rmtx.unlock();
 				continue;
 			}
+			{
+				char str[INET6_ADDRSTRLEN];
+				inet_ntop(AF_INET6, &(con.adresse.sin6_addr), str, INET6_ADDRSTRLEN);
+				std::cout << str << ":" << ntohs(con.adresse.sin6_port) << " Verbunden\n";
+			}
 			con.pending = 0;
 			con.rbuf = Array<uint8_t>(1024);
 			con.routput = con.rinput = con.rbuf.begin();
@@ -347,6 +224,7 @@ void Server::connectionshandler()
 			con.streams = Array<Stream>(100);
 			con.streamsend = con.streams.begin();
 			FD_SET(con.csocket, &sockets);
+			nfds = std::max(con.csocket + 1, nfds);
 			++connectionsend;
 			con.rmtx.unlock();
 			timeout = { 0,0 };
@@ -360,10 +238,11 @@ void Server::connectionshandler()
 				Connection & con = *conit;
 				if (con.cssl != nullptr && (length = con.rinput.PointerWriteableLength(con.routput)) > 0 && con.rmtx.try_lock())
 				{
-					if ((con.pending || (select(1024, &active, nullptr, nullptr, &poll) && FD_ISSET(con.csocket, &active))))
+					if (((con.pending > 0) || (select(nfds, &active, nullptr, nullptr, &poll) && FD_ISSET(con.csocket, &active))))
 					{
 						if ((length = SSL_read(con.cssl, con.rinput.Pointer(), length)) <= 0)
 						{
+							std::cout << "Verbindung verloren:" << length << "\n";
 							con.wmtx.lock();
 							if (con.csocket != -1)
 							{
@@ -373,11 +252,15 @@ void Server::connectionshandler()
 								con.cssl = 0;
 							}
 							for (; connectionsbegin != connectionsend && connectionsbegin->csocket == -1; ++connectionsbegin);
+							con.pending = 0;
 							con.wmtx.unlock();
+							continue;
 						}
 						else
 						{
-							FD_CLR(con.csocket, &active);//can evntl crash __i=155 ???
+							std::cout << "Empfangen:" << length << "\n";
+
+							//FD_CLR(con.csocket, &active);//can evntl crash __i=155 ???
 							con.pending = SSL_pending(con.cssl);
 							con.rinput += length;
 						}
@@ -385,12 +268,14 @@ void Server::connectionshandler()
 					}
 					con.rmtx.unlock();
 				}
-				else if (con.cssl != nullptr && (length = con.rinput - con.routput) >= 9 && con.wmtx.try_lock())
+				if (con.cssl != nullptr && (length = con.rinput - con.routput) >= 9 && con.wmtx.try_lock())
 				{
+					std::cout << "Verarbeiten:" << length << "\n";
 					const char http2preface[] = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 					if (std::search(con.routput, con.rinput, http2preface, http2preface + 24) == con.routput)
 					{
 						con.routput += 24;
+						std::cout << http2preface;
 						if ((length = con.rinput - con.routput) < 9)
 						{
 							con.wmtx.unlock();
@@ -407,12 +292,30 @@ void Server::connectionshandler()
 					if (frame.type > Frame::Type::CONTINUATION)
 					{
 						con.wmtx.unlock();
-						__debugbreak();
 						continue;
 					}
-					while ((con.rinput - con.routput) < frame.length)
 					{
-						std::this_thread::sleep_for(1ms);
+						int i = 100;
+						while ((con.rinput - con.routput) < frame.length && i >= 0)
+						{
+							std::this_thread::sleep_for(1ms);
+							
+							i--;
+						}
+						if (i < 0)
+						{
+							con.rmtx.lock();
+							if (con.csocket != -1)
+							{
+								SSL_free(con.cssl);
+								FD_CLR(con.csocket, &sockets);
+								Http::CloseSocket(con.csocket);
+								con.cssl = 0;
+							}
+							for (; connectionsbegin != connectionsend && connectionsbegin->csocket == -1; ++connectionsbegin);
+							con.rmtx.unlock();
+							continue;
+						}
 					}
 					auto frameend = con.routput + frame.length;
 					switch (frame.type)
@@ -425,6 +328,8 @@ void Server::connectionshandler()
 					case Frame::Type::HEADERS:
 					{
 						Stream &stream = *con.streamsend++;
+						stream.state = (((uint8_t)frame.flags & (uint8_t)Frame::Flags::END_STREAM) == (uint8_t)Frame::Flags::END_STREAM) ? Stream::State::half_closed_remote : Stream::State::open;
+						stream.streamIndentifier = frame.streamIndentifier;
 						uint32_t hl = frame.length;
 						if (((uint8_t)frame.flags & (uint8_t)Frame::Flags::PADDED) == (uint8_t)Frame::Flags::PADDED)
 						{
@@ -440,16 +345,20 @@ void Server::connectionshandler()
 						}
 						if (frame.length < hl)
 						{
-							__debugbreak();
+							continue;
 						}
-						stream.headerlist = Array<std::pair<std::string, std::string>>(50);
+						std::cout << "Create Header Array\n";
+						stream.headerlist = Array<std::pair<std::string, std::string>>(20);
 						stream.headerlistend = stream.headerlist.begin();
+						std::cout << "Decode Header Block\n";
 						con.routput = con.hdecoder.Headerblock(con.routput, con.routput + hl, stream.headerlistend);
+						std::cout << "Decoded Header Block\n";
 						std::string search = ":path";
 						auto res = std::search(stream.headerlist.begin(), stream.headerlistend, &search, &search + 1, HPack::KeySearch<std::string, std::string>);
 						if (res != stream.headerlistend)
 						{
-							fs::path filepath = "C:\\", args;
+							fs::path filepath = rootpath;
+							std::string args, uri;
 							{
 								size_t pq = res->second.find('?');
 								if (pq != std::string::npos)
@@ -462,196 +371,278 @@ void Server::connectionshandler()
 									filepath /= Utility::urlDecode(res->second);
 								}
 							}
-							con.winput += 3;
-							*con.winput++ = (unsigned char)Frame::Type::HEADERS;
-							*con.winput++ = (unsigned char)Frame::Flags::END_HEADERS;
-							con.winput = std::reverse_copy((unsigned char*)&frame.streamIndentifier, (unsigned char*)&frame.streamIndentifier + sizeof(frame.streamIndentifier), con.winput);
-							
-							Utility::Array<std::pair<std::string, std::string>> headerlist(20);
-							Utility::RotateIterator<std::pair<std::string, std::string>> headerlistend = headerlist.begin();
-
-							search = ":method";
-							res = std::search(stream.headerlist.begin(), stream.headerlistend, &search, &search + 1, HPack::KeySearch<std::string, std::string>);
-							if ((res->second == Http::Get || res->second == Http::Head) && fs::is_regular_file(filepath))
+							std::cout << filepath << "\n";
 							{
+								Utility::Array<std::pair<std::string, std::string>> headerlist(20);
+								Utility::RotateIterator<std::pair<std::string, std::string>> headerlistend = headerlist.begin();
+
+								if (ValidFile(filepath, uri))
 								{
-									Utility::Array<char> buf(128);
-									time_t date = fs::file_time_type::clock::to_time_t(fs::last_write_time(filepath));
-									strftime(buf.data(), buf.length(), "%a, %d %b %Y %H:%M:%S GMT", std::gmtime(&date));
-									search = "if-modified-since";
-									res = std::search(stream.headerlist.begin(), stream.headerlistend, &search, &search + 1, HPack::KeySearch<std::string, std::string>);
-									if (res != stream.headerlistend && res->second == buf.data())
+									fs::path ext = filepath.extension();
+									if (ext == ".dll")
 									{
-										*headerlistend++ = { ":status", "304" };
-										con.winput = con.hencoder.Headerblock(con.winput, headerlist.begin(), headerlistend);
-										//*con.winput++ = 0x80 | 11;
+										auto res = std::search(libs.begin(), libsend, &filepath, &filepath + 1, [](const std::tuple<std::experimental::filesystem::path, void*, void(*)(Connection&, Stream&, const fs::path&, const std::string&, const std::string&)> & left, const std::experimental::filesystem::path & right) {
+											return std::get<0>(left) == right;
+										});
+										void(*requesthandler)(Connection&, Stream&, const fs::path&, const std::string&, const std::string&);
+										if (res == libsend)
 										{
-											uint32_t l = (con.winput - con.woutput) - 9;
-											std::reverse_copy((unsigned char*)&l, (unsigned char*)&l + 3, con.woutput);
+											libsmtx.lock();
+											auto &lib = std::get<1>(*libsend);
+											lib = dlopen(filepath.c_str());
+											auto init = (void(*)())dlsym(lib, initsymbol);
+											if (init != nullptr) init();
+											requesthandler = std::get<2>(*libsend) = (void(*)(Connection&, Stream&, const fs::path&, const std::string&, const std::string&))dlsym(lib, mainsymbol);
+											if (requesthandler == nullptr)
+											{
+												dlclose(lib);
+												libsmtx.unlock();
+												throw std::runtime_error(u8"Datei kann nicht ausgeführt werden");
+											}
+											std::get<0>(*libsend) = filepath;
+											++libsend;
+											libsmtx.unlock();
 										}
-										con.woutput[4] |= (unsigned char)Frame::Flags::END_STREAM;
-										do
+										else
 										{
-											con.woutput += SSL_write(con.cssl, con.woutput.Pointer(), con.woutput.PointerReadableLength(con.winput));
-										} while (con.woutput != con.winput);
-										break;
-									}
-									*headerlistend++ = { ":status", "200" };
-									//*con.winput++ = 0x80 | 8;//Http Ok
-									*headerlistend++ = { "last-modified", buf.data() };
-									//*con.winput++ = 0x40 | 44;//Last Modified Inc indexing
-									//con.winput = HPack::Encoder::StringH(con.winput, buf.data());
-									time(&date);
-									strftime(buf.data(), buf.length(), "%a, %d %b %Y %H:%M:%S GMT", std::gmtime(&date));
-									*headerlistend++ = { "date", buf.data() };
-									//*con.winput++ = 0x40 | 33;//Date Inc indexing
-									//con.winput = HPack::Encoder::StringH(con.winput, buf.data());
-									*headerlistend++ = { "accept-ranges", "bytes" };
-									//*con.winput++ = 0x40 | 18;
-									//con.winput = HPack::Encoder::StringH(con.winput, "bytes");
-								}
-								uintmax_t offset = 0, length = fs::file_size(filepath);
-								search = "range";
-								res = std::search(stream.headerlist.begin(), stream.headerlistend, &search, &search + 1, HPack::KeySearch<std::string, std::string>);
-								if (res != stream.headerlistend)
-								{
-									uintmax_t lpos = length - 1;
-									std::istringstream iss(res->second.substr(6));
-									iss >> offset;
-									iss.ignore(1, '-');
-									iss >> lpos;
-									if (offset <= lpos && lpos < length)
-									{
-										length = lpos + 1 - offset;
-										*headerlist.begin() = { ":status", "206" };
-										//*con.winput++ = 0x80 | 10;
-										//*con.winput++ = 0x40 | 30;
-										//con.winput = HPack::Encoder::StringH(con.winput, res->second);
+											requesthandler = std::get<2>(*res);
+										}
+										requesthandler(con, stream, filepath, uri, args);
 									}
 									else
 									{
-										con.woutput[5] |= (unsigned char)Frame::Flags::END_STREAM;
-										*headerlist.begin() = { ":status", "206" };
-										//*con.winput++ = 8;//Never indexed 0000
-										//con.winput = HPack::Encoder::StringH(con.winput, std::to_string(416));
-										uint32_t l = (con.winput - con.woutput) - 9;
-										std::reverse_copy((unsigned char*)&l, (unsigned char*)&l + 3, con.woutput);
-										do
+										search = ":method";
+										res = std::search(stream.headerlist.begin(), stream.headerlistend, &search, &search + 1, HPack::KeySearch<std::string, std::string>);
+										if (res != stream.headerlistend && (res->second == Http::Get || res->second == Http::Head))
 										{
-											con.woutput += SSL_write(con.cssl, con.woutput.Pointer(), con.woutput.PointerReadableLength(con.winput));
-										} while (con.woutput != con.winput);
-										break;
+											{
+												std::cout << res->second << "\n";
+												Utility::Array<char> buf(128);
+												time_t date = fs::file_time_type::clock::to_time_t(fs::last_write_time(filepath));
+												strftime(buf.data(), buf.length(), "%a, %d %b %Y %H:%M:%S GMT", std::gmtime(&date));
+												search = "if-modified-since";
+												res = std::search(stream.headerlist.begin(), stream.headerlistend, &search, &search + 1, HPack::KeySearch<std::string, std::string>);
+												if (res != stream.headerlistend && res->second == buf.data())
+												{
+													*headerlistend++ = { ":status", "304" };
+													con.winput = con.hencoder.Headerblock(con.winput, headerlist.begin(), headerlistend);
+													{
+														uint32_t l = (con.winput - con.woutput) - 9;
+														std::reverse_copy((unsigned char*)&l, (unsigned char*)&l + 3, con.woutput);
+													}
+													con.woutput[4] |= (unsigned char)Frame::Flags::END_STREAM;
+													do
+													{
+														con.woutput += SSL_write(con.cssl, con.woutput.Pointer(), con.woutput.PointerReadableLength(con.winput));
+													} while (con.woutput != con.winput);
+													break;
+												}
+												*headerlistend++ = { ":status", "200" };
+												*headerlistend++ = { "last-modified", buf.data() };
+												time(&date);
+												strftime(buf.data(), buf.length(), "%a, %d %b %Y %H:%M:%S GMT", std::gmtime(&date));
+												*headerlistend++ = { "date", buf.data() };
+												*headerlistend++ = { "accept-ranges", "bytes" };
+											}
+											uintmax_t offset = 0, length = fs::file_size(filepath);
+											search = "range";
+											res = std::search(stream.headerlist.begin(), stream.headerlistend, &search, &search + 1, HPack::KeySearch<std::string, std::string>);
+											if (res != stream.headerlistend)
+											{
+												uintmax_t lpos = length - 1;
+												std::istringstream iss(res->second.substr(6));
+												iss >> offset;
+												iss.ignore(1, '-');
+												iss >> lpos;
+												if (offset <= lpos && lpos < length)
+												{
+													length = lpos + 1 - offset;
+													*headerlist.begin() = { ":status", "206" };
+												}
+												else
+												{
+													*headerlist.begin() = { ":status", "416" };
+													con.winput += 3;
+													*con.winput++ = (unsigned char)Frame::Type::HEADERS;
+													*con.winput++ = (unsigned char)Frame::Flags::END_HEADERS | (unsigned char)Frame::Flags::END_STREAM;
+													con.winput = std::reverse_copy((unsigned char*)&frame.streamIndentifier, (unsigned char*)&frame.streamIndentifier + sizeof(frame.streamIndentifier), con.winput);
+													con.winput = con.hencoder.Headerblock(con.winput, headerlist.begin(), headerlistend);
+													{
+														uint32_t l = (con.winput - con.woutput) - 9;
+														std::reverse_copy((unsigned char*)&l, (unsigned char*)&l + 3, con.woutput);
+													}
+													do
+													{
+														con.woutput += SSL_write(con.cssl, con.woutput.Pointer(), con.woutput.PointerReadableLength(con.winput));
+													} while (con.woutput != con.winput);
+													break;
+												}
+											}
+											*headerlistend++ = { "content-length", std::to_string(length) };
+											{
+												*headerlistend++ = { "content-type", std::search(MimeTypeTable, MimeTypeTable + (sizeof(MimeTypeTable) / sizeof(std::pair<fs::path, std::string>) - 1), &ext, &ext + 1, HPack::KeySearch<fs::path, std::string>)->second };
+											}
+											if (args == "herunterladen")
+											{
+												*headerlistend++ = { "content-disposition", "attachment" };
+											}
+											{
+												std::ifstream stream = std::ifstream(filepath, std::ios::binary);
+												if (!stream.is_open()) throw std::runtime_error(u8"Datei kann nicht geöffnet werden");
+												con.winput += 3;
+												*con.winput++ = (unsigned char)Frame::Type::HEADERS;
+												*con.winput++ = (unsigned char)Frame::Flags::END_HEADERS;
+												con.winput = std::reverse_copy((unsigned char*)&frame.streamIndentifier, (unsigned char*)&frame.streamIndentifier + sizeof(frame.streamIndentifier), con.winput);
+												con.winput = con.hencoder.Headerblock(con.winput, headerlist.begin(), headerlistend);
+												{
+													uint32_t l = (con.winput - con.woutput) - 9;
+													std::reverse_copy((unsigned char*)&l, (unsigned char*)&l + 3, con.woutput);
+												}
+												do
+												{
+													con.woutput += SSL_write(con.cssl, con.woutput.Pointer(), con.woutput.PointerReadableLength(con.winput));
+												} while (con.woutput != con.winput);
+												for (long long proc = 0; proc < length;)
+												{
+													uint64_t count = std::min((uint64_t)(length - proc), (con.winput + 9).PointerWriteableLength(con.woutput));
+													con.winput = std::reverse_copy((unsigned char*)&count, (unsigned char*)&count + 3, con.winput);
+													*con.winput++ = (unsigned char)Frame::Type::DATA;
+													*con.winput++ = count == (length - proc) ? (unsigned char)Frame::Flags::END_STREAM : 0;
+													con.winput = std::reverse_copy((unsigned char*)&frame.streamIndentifier, (unsigned char*)&frame.streamIndentifier + 4, con.winput);
+													stream.read((char*)con.winput.Pointer(), count);
+													con.winput += count;
+													proc += count;
+													do
+													{
+														con.woutput += SSL_write(con.cssl, con.woutput.Pointer(), con.woutput.PointerReadableLength(con.winput));
+													} while (con.woutput != con.winput);
+												}
+
+												//{
+												//	long long read = 0, sent = 0;
+												//	std::atomic<bool> interrupt(true);
+												//	stream.seekg(offset, std::ios::beg);
+												//	std::thread readfileasync([streamid = &frame.streamIndentifier, &con, &stream, &length, &read, &interrupt]() {
+												//		try {
+												//			long long count;
+												//			while (read < length && interrupt.load())
+												//			{
+												//				if ((count = std::min(length - read, (uint64_t)(con.winput + 9).PointerWriteableLength(con.woutput))) > 0)
+												//				{
+												//					con.winput = std::reverse_copy((unsigned char*)&count, (unsigned char*)&count + 3, con.winput);
+												//					*con.winput++ = (unsigned char)Frame::Type::DATA;
+												//					*con.winput++ = count == (length - read) ? (unsigned char)Frame::Flags::END_STREAM : 0;
+												//					con.winput = std::reverse_copy((unsigned char*)streamid, (unsigned char*)streamid + 4, con.winput);
+												//					stream.read((char*)con.winput.Pointer(), count);
+												//					con.winput += count;
+												//					read += count;
+												//				}
+												//			}
+												//		}
+												//		catch (const std::exception &ex)
+												//		{
+
+												//		}
+												//		interrupt.store(false);
+												//	});
+												//	long long count;
+												//	while (sent < length && interrupt.load() || con.woutput != con.winput)
+												//	{
+												//		if ((count = con.woutput.PointerReadableLength(con.winput)) > 0)
+												//		{
+												//			if ((count = SSL_write((SSL*)con.cssl, con.woutput.Pointer(), count)) <= 0)
+												//			{
+												//				interrupt.store(false);
+												//				readfileasync.join();
+												//				throw std::runtime_error("RequestBuffer::Send(std::istream &stream, long long offset, long long length) Verbindungs Fehler");
+												//			}
+												//			con.woutput += count;
+												//			sent += count;
+												//		}
+												//	}
+												//	interrupt.store(false);
+												//	readfileasync.join();
+												//}
+											}
+										}
+										//else
+										//{
+										//	search = "content-type";
+										//	res = std::search(stream.headerlist.begin(), stream.headerlistend, &search, &search + 1, HPack::KeySearch<std::string, std::string>);
+										//	if (res != stream.headerlistend)
+										//	{
+										//		struct
+										//		{
+										//			std::string contentSeperator;
+										//			std::ofstream fileStream;
+										//			fs::path serverPath;
+										//		} args;
+										//		args.contentSeperator = "--" + Http::Values(res->second)["boundary"];
+										//		args.serverPath = filepath;
+										//		stream.datahandler = [&con, &args](Frame & frame)->void {
+										//			int contentSeperatorI = buffer.indexof(args.contentSeperator);
+										//			if (args.fileStream.is_open() && (contentSeperatorI == -1 || contentSeperatorI > 2))
+										//			{
+										//				const int data = contentSeperatorI == -1 ? (buffer.length() - args.contentSeperator.length() + 1) : (contentSeperatorI - 2);
+										//				buffer.MoveTo(args.fileStream, data);
+										//				return contentSeperatorI == -1 ? 0 : 2;
+										//			}
+										//			else if (contentSeperatorI != -1)
+										//			{
+										//				int offset = contentSeperatorI + args.contentSeperator.length(), fileHeader = buffer.indexof("\r\n\r\n", 4, offset);
+										//				if (fileHeader != -1)
+										//				{
+										//					if (args.fileStream.is_open())
+										//					{
+										//						args.fileStream.close();
+										//					}
+										//					std::string name = Http::Parameter(std::string(buffer.begin() + offset + 2, buffer.begin() + fileHeader))["Content-Disposition"]["name"];
+										//					args.fileStream.open((args.serverPath / name.substr(1, name.length() - 2)), std::ios::binary);
+										//					return fileHeader + 4;
+										//				}
+										//				fileHeader = buffer.indexof("--\r\n", 4, offset);
+										//				if (fileHeader != -1)
+										//				{
+										//					if (args.fileStream.is_open())
+										//					{
+										//						args.fileStream.close();
+										//					}
+										//					auto &responseHeader = buffer.response();
+										//					responseHeader.status = Ok;
+										//					buffer.Send(responseHeader.toString());
+										//					return ~(fileHeader + 4);
+										//				}
+										//			}
+										//		};
+										//		break;
+										//	}
+										//}
 									}
 								}
-								*headerlistend++ = { "content-length", std::to_string(length) };
-								//*con.winput++ = 0x40 | 28;
-								//con.winput = HPack::Encoder::StringH(con.winput, std::to_string(length));
+								else
 								{
-									fs::path ext = filepath.extension();
-									*headerlistend++ = { "content-type", std::search(MimeTypeTable, MimeTypeTable + (sizeof(MimeTypeTable) / sizeof(std::pair<fs::path, std::string>) - 1), &ext, &ext + 1, HPack::KeySearch<fs::path, std::string>)->second };
-									//*con.winput++ = 0x40 | 31;//Content-Type
-									//std::string &res = std::search(MimeTypeTable, MimeTypeTable + (sizeof(MimeTypeTable) / sizeof(std::pair<fs::path, std::string>) - 1), &ext, &ext + 1, HPack::KeySearch<fs::path, std::string>)->second;
-									//con.winput = HPack::Encoder::StringH(con.winput, res);
-								}
-								if (args == "herunterladen")
-								{
-									*headerlistend++ = { "content-disposition", "attachment" };
-									//*con.winput++ = 0x40 | 25;//Content-Disposition
-									//con.winput = HPack::Encoder::StringH(con.winput, "attachment");
-								}
-								{
-									std::ifstream stream = std::ifstream(filepath, std::ios::binary);
-									if (!stream.is_open()) throw std::runtime_error(u8"Datei kann nicht geöffnet werden");
+									*headerlist.begin() = { ":status", "404" };
+									headerlistend = headerlist.begin() + 1;
+									con.winput += 3;
+									*con.winput++ = (unsigned char)Frame::Type::HEADERS;
+									*con.winput++ = (unsigned char)Frame::Flags::END_HEADERS | (unsigned char)Frame::Flags::END_STREAM;
+									con.winput = std::reverse_copy((unsigned char*)&frame.streamIndentifier, (unsigned char*)&frame.streamIndentifier + sizeof(frame.streamIndentifier), con.winput);
 									con.winput = con.hencoder.Headerblock(con.winput, headerlist.begin(), headerlistend);
-									uint32_t l = (con.winput - con.woutput) - 9;
-									std::reverse_copy((unsigned char*)&l, (unsigned char*)&l + 3, con.woutput);
+									{
+										uint32_t l = (con.winput - con.woutput) - 9;
+										std::reverse_copy((unsigned char*)&l, (unsigned char*)&l + 3, con.woutput);
+									}
 									do
 									{
 										con.woutput += SSL_write(con.cssl, con.woutput.Pointer(), con.woutput.PointerReadableLength(con.winput));
 									} while (con.woutput != con.winput);
-									for (long long proc = 0; proc < length;)
-									{
-										long long count = std::min(length - proc, (con.winput + 9).PointerWriteableLength(con.woutput));
-										con.winput = std::reverse_copy((unsigned char*)&count, (unsigned char*)&count + 3, con.winput);
-										*con.winput++ = (unsigned char)Frame::Type::DATA;
-										*con.winput++ = count == (length - proc) ? (unsigned char)Frame::Flags::END_STREAM : 0;
-										con.winput = std::reverse_copy((unsigned char*)&frame.streamIndentifier, (unsigned char*)&frame.streamIndentifier + 4, con.winput);
-										stream.read((char*)con.winput.Pointer(), count);
-										con.winput += count;
-										proc += count;
-										do
-										{
-											con.woutput += SSL_write(con.cssl, con.woutput.Pointer(), con.woutput.PointerReadableLength(con.winput));
-										} while (con.woutput != con.winput);
-									}
-
-									//{
-									//	long long read = 0, sent = 0;
-									//	std::atomic<bool> interrupt(true);
-									//	stream.seekg(offset, std::ios::beg);
-									//	std::thread readfileasync([streamid = &frame.streamIndentifier, &con, &stream, &length, &read, &interrupt]() {
-									//		try {
-									//			long long count;
-									//			while (read < length && interrupt.load())
-									//			{
-									//				if ((count = std::min(length - read, (uint64_t)(con.winput + 9).PointerWriteableLength(con.woutput))) > 0)
-									//				{
-									//					con.winput = std::reverse_copy((unsigned char*)&count, (unsigned char*)&count + 3, con.winput);
-									//					*con.winput++ = (unsigned char)Frame::Type::DATA;
-									//					*con.winput++ = count == (length - read) ? (unsigned char)Frame::Flags::END_STREAM : 0;
-									//					con.winput = std::reverse_copy((unsigned char*)streamid, (unsigned char*)streamid + 4, con.winput);
-									//					stream.read((char*)con.winput.Pointer(), count);
-									//					con.winput += count;
-									//					read += count;
-									//				}
-									//			}
-									//		}
-									//		catch (const std::exception &ex)
-									//		{
-
-									//		}
-									//		interrupt.store(false);
-									//	});
-									//	long long count;
-									//	while (sent < length && interrupt.load() || con.woutput != con.winput)
-									//	{
-									//		if ((count = con.woutput.PointerReadableLength(con.winput)) > 0)
-									//		{
-									//			if ((count = SSL_write((SSL*)con.cssl, con.woutput.Pointer(), count)) <= 0)
-									//			{
-									//				interrupt.store(false);
-									//				readfileasync.join();
-									//				throw std::runtime_error("RequestBuffer::Send(std::istream &stream, long long offset, long long length) Verbindungs Fehler");
-									//			}
-									//			con.woutput += count;
-									//			sent += count;
-									//		}
-									//	}
-									//	interrupt.store(false);
-									//	readfileasync.join();
-									//}
+									break;
 								}
-							}
-							else
-							{
-								*headerlistend++ = { ":status", "404" };
-								con.winput = con.hencoder.Headerblock(con.winput, headerlist.begin(), headerlistend);
-								//*con.winput++ = 0x80 | 11;
-								{
-									uint32_t l = (con.winput - con.woutput) - 9;
-									std::reverse_copy((unsigned char*)&l, (unsigned char*)&l + 3, con.woutput);
-								}
-								con.woutput[4] |= (unsigned char)Frame::Flags::END_STREAM;
-								do
-								{
-									con.woutput += SSL_write(con.cssl, con.woutput.Pointer(), con.woutput.PointerReadableLength(con.winput));
-								} while (con.woutput != con.winput);
-								break;
 							}
 						}
 						else
 						{
-							__debugbreak();
+							//__debugbreak();
 						}
 						break;
 					}
@@ -742,7 +733,7 @@ void Server::connectionshandler()
 					}
 					if (con.routput != frameend)
 					{
-						__debugbreak();
+						//__debugbreak();
 					}
 					timeout = { 0,0 };
 					con.wmtx.unlock();

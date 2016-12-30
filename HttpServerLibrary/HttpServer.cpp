@@ -49,149 +49,6 @@
 using namespace Http;
 namespace fs = std::experimental::filesystem;
 
-#ifndef _WIN32
-#define isnan(a) std::isnan(a)
-#include <php.h>
-#include <php_main.h>
-#include <php_ini.h>
-#include <php_variables.h>
-#include <SAPI.h>
-
-static zend_module_entry php_module;
-
-static int php_startup(sapi_module_struct *sapi_module)
-{
-	std::cout << "php startup\n";
-	if (php_module_startup(sapi_module, &php_module, 1) == 1) {
-		return 1;
-	}
-	return 0;
-}
-
-static size_t
-php_sapi_ub_write(const char *str, size_t str_length)
-{
-	std::cout << "PHP:" << std::string(str, str_length) << "\"," << str_length << "\n";
-	return str_length;
-}
-
-static void
-php_sapi_flush(void *server_context)
-{
-	std::cout << "php flush\n";
-
-	sapi_send_headers();
-	SG(headers_sent) = 1;
-}
-
-static zend_stat_t*
-php_sapi_get_stat(void)
-{
-	std::cout << "php get stat\n";
-
-	zend_stat_t stat;
-	stat.st_gid = 0;
-	return &stat;
-}
-
-static char *
-php_sapi_getenv(char *name, size_t name_len)
-{
-	return (char *)"<Hallo>";
-}
-
-static int
-php_sapi_header_handler(sapi_header_struct *sapi_header, sapi_header_op_enum op, sapi_headers_struct *sapi_headers)
-{
-	std::cout << "header heandler\n";
-
-	switch (op) {
-	case SAPI_HEADER_DELETE:
-
-		return 0;
-	case SAPI_HEADER_DELETE_ALL:
-
-		return 0;
-	case SAPI_HEADER_ADD:
-	case SAPI_HEADER_REPLACE:
-
-		return SAPI_HEADER_ADD;
-	default:
-		return 0;
-	}
-}
-
-static int
-php_sapi_send_headers(sapi_headers_struct *sapi_headers)
-{
-	printf("HTTP/1.1 %d %s", sapi_headers->http_response_code, sapi_headers->http_status_line);
-	return SAPI_HEADER_SENT_SUCCESSFULLY;
-}
-
-static size_t
-php_sapi_read_post(char *buf, size_t count_bytes)
-{
-	std::cout << "php read post\n";
-
-	memset(buf, 0, count_bytes);
-	return count_bytes;
-}
-
-static char *
-php_sapi_read_cookies(void)
-{
-	std::cout << "php read cookie\n";
-
-	return 0;
-}
-
-static void
-php_sapi_register_variables(zval *track_vars_array)
-{
-	std::cout << "php reg var\n";
-
-	char *php_self = (char *)(SG(request_info).request_uri ? SG(request_info).request_uri : "");
-	size_t php_self_len = strlen(php_self);
-	if (sapi_module.input_filter(PARSE_SERVER, "PHP_SELF", &php_self, php_self_len, &php_self_len)) {
-		php_register_variable_safe("PHP_SELF", php_self, php_self_len, track_vars_array);
-	}
-}
-
-static void php_sapi_log_message(char *message)
-{
-	std::cout << message << "\n";
-}
-
-sapi_module_struct phpplugin = {
-	"phppluginwebserver",
-	"PHP Plugin for Webserver alpha",
-	php_startup,
-	php_module_shutdown_wrapper,
-	NULL,
-	NULL,
-	php_sapi_ub_write,			/* unbuffered write */
-	php_sapi_flush,				/* flush */
-	php_sapi_get_stat,			/* get uid */
-	php_sapi_getenv,				/* getenv */
-
-	php_error,					/* error handler */
-
-	php_sapi_header_handler,			/* header handler */
-	php_sapi_send_headers,			/* send headers handler */
-	NULL,						/* send header handler */
-
-	php_sapi_read_post,			/* read POST data */
-	php_sapi_read_cookies,			/* read Cookies */
-
-	php_sapi_register_variables,
-	php_sapi_log_message,			/* Log message */
-	NULL,		/* Request Time */
-	NULL,						/* Child Terminate */
-
-	STANDARD_SAPI_MODULE_PROPERTIES
-};
-#endif
-
 Server::Server()
 {
 	servermainstop.store(false);
@@ -485,7 +342,7 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 	std::cout << buffer->Client() << " Verbunden\n";
 	buffer->RecvData([&status, &OnRequest = onrequest](RequestBuffer &buffer) -> long long
 	{
-		Response &response = buffer.Response();
+		Response &response = buffer.response();
 		response.Clear();
 		response["Content-Length"] = "0";
 		try
@@ -494,7 +351,7 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 			if (header > 0)
 			{
 				header += 4;
-				auto &reqest = buffer.Request() = Request(std::string(buffer.begin(), buffer.begin() + header));
+				auto &reqest = buffer.request() = Request(std::string(buffer.begin(), buffer.begin() + header));
 				buffer.Free(header);
 				status.path = buffer.Client() + " -> " + reqest.methode + ":" + reqest.request;
 				if (OnRequest) OnRequest(status);

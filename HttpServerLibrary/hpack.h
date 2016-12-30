@@ -8,13 +8,6 @@ namespace Http2
 {
 	namespace HPack
 	{
-		//template<class T1, class T2>
-		//struct TableEntry
-		//{
-		//	T1 key;
-		//	T2 value;
-		//};
-
 		template<class T1, class T2>
 		bool KeySearch(const std::pair<T1, T2> &entry, const T1 & first)
 		{
@@ -27,10 +20,20 @@ namespace Http2
 			return entry.second == second;
 		}
 
-		std::pair<uint32_t, uint8_t> StaticHuffmanTable[];
-		std::pair<std::string, std::string> StaticTable[];
+		extern std::pair<uint32_t, uint8_t> StaticHuffmanTable[];
+		extern std::pair<std::string, std::string> StaticTable[];
 
-		class Encoder
+		//class Coder
+		//{
+		//protected:
+		//	Utility::Array<std::pair<std::string, std::string>> dynamictable;
+		//	Utility::RotateIterator<std::pair<std::string, std::string>> dynamictableend;
+		//public:
+		//	Coder();
+		//	void ClearDynamicTable();
+		//};
+
+		class Encoder //: public Coder
 		{
 		private:
 			Utility::Array<std::pair<std::string, std::string>> dynamictable;
@@ -43,10 +46,9 @@ namespace Http2
 			static Utility::RotateIterator<uint8_t> Huffman(Utility::RotateIterator<uint8_t> pos, const std::string & string);
 			static Utility::RotateIterator<uint8_t> String(Utility::RotateIterator<uint8_t> pos, const std::string & source);
 			static Utility::RotateIterator<uint8_t> StringH(Utility::RotateIterator<uint8_t> pos, const std::string & source);
-
 		};
 
-		class Decoder
+		class Decoder //: public Coder
 		{
 		private:
 			Utility::Array<std::pair<std::string, std::string>> dynamictable;

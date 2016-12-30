@@ -14,17 +14,19 @@
 #undef max
 #define SHUT_RDWR SD_BOTH
 #else
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <dlfcn.h>
 #include <sys/types.h>
 #include <signal.h>
+#include <netinet/in.h>
 #define closesocket(socket) close(socket)
 #endif
 
 namespace Http2
 {
-	std::pair<std::experimental::filesystem::path, std::string> MimeTypeTable[];
+	extern std::pair<std::experimental::filesystem::path, std::string> MimeTypeTable[];
 
 	struct Frame
 	{
@@ -118,6 +120,7 @@ namespace Http2
 		uint32_t streamIndentifier;
 		Utility::Array<std::pair<std::string, std::string>> headerlist;
 		Utility::RotateIterator<std::pair<std::string, std::string>> headerlistend;
+		std::function<void(Frame&)> datahandler;
 	};
 
 	struct Connection
@@ -148,10 +151,13 @@ namespace Http2
 		Utility::RotateIterator<Connection> connectionsbegin;
 		Utility::RotateIterator<Connection> connectionsend;
 		bool running;
+		std::experimental::filesystem::path rootpath;
+		Utility::Array<std::tuple<std::experimental::filesystem::path, void*, void(*)(Connection&, Stream&, const std::experimental::filesystem::path&, const std::string&, const std::string&)>> libs;
+		Utility::RotateIterator<std::tuple<std::experimental::filesystem::path, void*, void(*)(Connection&, Stream&, const std::experimental::filesystem::path&, const std::string&, const std::string&)>> libsend;
+		std::mutex libsmtx;
 		void connectionshandler();
 	public:
-		void Start(const std::experimental::filesystem::path &certroot);
-		Server();
+		Server(const std::experimental::filesystem::path &certroot, const std::experimental::filesystem::path & rootpath);
 		~Server();
 	};
 }
