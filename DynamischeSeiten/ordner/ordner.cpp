@@ -122,7 +122,7 @@ int seite(RequestBuffer& buffer)
 		Values& contenttype = requestHeader["Content-Type"];
 		if (contenttype.Exists("multipart/form-data") && requestHeader.putValues.Exists("folder") && benutzer.size() > 0 && requestHeader.Exists("Cookie") && requestHeader["Cookie"].Exists("Sessionid") && benutzer.find(requestHeader["Cookie"]["Sessionid"]) != benutzer.end())
 		{
-			fs::path serverPath(buffer.RootPath() / requestHeader.putValues["folder"]);	
+			fs::path serverPath(buffer.RootPath() / requestHeader.putValues["folder"]);
 			if (!fs::is_directory(serverPath))
 			{
 				throw NotFoundError("Ziel Ordner nicht gefunden");
@@ -181,7 +181,7 @@ int seite(RequestBuffer& buffer)
 			std::string username(buffer.begin() + un + 9, buffer.begin() + buffer.indexof("&", 1, un + 9));
 			int up = buffer.indexof("Passwort=", 9, un + 9);
 			std::string password(buffer.begin() + up + 9, buffer.begin() + contentlength);
-			Array<char> buf(33);
+			std::vector<char> buf(33);
 			for (int i = 0; i < 32; i++)
 			{
 				buf[i] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[rand() % 62];

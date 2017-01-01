@@ -3,6 +3,7 @@
 #include <memory>
 #include <algorithm>
 #include <cstring>
+#include <cstdint>
 
 namespace Utility {
 
@@ -14,32 +15,32 @@ namespace Utility {
 		std::size_t length;
 	};
 
-	template<class Type>
-	class RotateIterator;
+	//template<class Type>
+	//class RotateIterator;
 
-	template <class Type>
-	class Array
-	{
-	private:
-		Ranges<Type> ranges;
-		bool _owner;
-	public:
-		Array(Array && obj);
-		Array(Array & obj);
-		Array(std::size_t length);
-		Array(Array array, std::size_t offset, std::size_t length);
-		Array(Type * array, std::size_t offset, std::size_t length);
-		Array();
-		~Array();
-		Type* data();
-		Type &operator[](std::size_t i);
-		const std::size_t &length();
-		std::size_t indexof(const Type * buffer, std::size_t length, std::size_t offset);
-		std::size_t indexof(std::string string, std::size_t offset);
-		const Array & operator=(Array &&right);
-		RotateIterator<Type> begin();
-		RotateIterator<Type> end();
-	};
+	//template <class Type>
+	//class Array
+	//{
+	//private:
+	//	Ranges<Type> ranges;
+	//	bool _owner;
+	//public:
+	//	Array(Array && obj);
+	//	Array(Array & obj);
+	//	Array(std::size_t length);
+	//	Array(Array array, std::size_t offset, std::size_t length);
+	//	Array(Type * array, std::size_t offset, std::size_t length);
+	//	Array();
+	//	~Array();
+	//	Type* data();
+	//	Type &operator[](std::size_t i);
+	//	const std::size_t &length();
+	//	std::size_t indexof(const Type * buffer, std::size_t length, std::size_t offset);
+	//	std::size_t indexof(std::string string, std::size_t offset);
+	//	const Array & operator=(Array &&right);
+	//	RotateIterator<Type> begin();
+	//	RotateIterator<Type> end();
+	//};
 
 	template<class Type>
 	class RotateIterator : public std::iterator<std::random_access_iterator_tag, Type, long long, Type*, Type&>
@@ -76,117 +77,117 @@ namespace Utility {
 	};
 
 
-	template<class Type>
-	inline Array<Type>::Array(Array && obj)
-	{
-		obj._owner = false;
-		ranges = obj.ranges;
-		_owner = obj._owner;
-	}
+	//template<class Type>
+	//inline Array<Type>::Array(Array && obj)
+	//{
+	//	obj._owner = false;
+	//	ranges = obj.ranges;
+	//	_owner = obj._owner;
+	//}
 
-	template<class Type>
-	inline Array<Type>::Array(Array & obj)
-	{
-		ranges = obj.ranges;
-		ranges.begin = new Type[ranges.length];
-		_owner = true;
-		ranges.end = ranges.begin + ranges.length;
-		memcpy(ranges.begin, obj.ranges.begin, obj.ranges.length);
-	}
+	//template<class Type>
+	//inline Array<Type>::Array(Array & obj)
+	//{
+	//	ranges = obj.ranges;
+	//	ranges.begin = new Type[ranges.length];
+	//	_owner = true;
+	//	ranges.end = ranges.begin + ranges.length;
+	//	memcpy(ranges.begin, obj.ranges.begin, obj.ranges.length);
+	//}
 
-	template<class Type>
-	inline Array<Type>::Array(std::size_t length)
-	{
-		ranges.begin = new Type[length];
-		_owner = true;
-		ranges.end = ranges.begin + length;
-		ranges.length = length;
-	}
+	//template<class Type>
+	//inline Array<Type>::Array(std::size_t length)
+	//{
+	//	ranges.begin = new Type[length];
+	//	_owner = true;
+	//	ranges.end = ranges.begin + length;
+	//	ranges.length = length;
+	//}
 
-	template<class Type>
-	inline Array<Type>::Array(Array<Type> array, std::size_t offset, std::size_t length)
-	{
-		_owner = false;
-		ranges = array.ranges;
-		ranges.begin += offset;
-		ranges.end = ranges.begin + length;
-		ranges.length = length;
-	}
+	//template<class Type>
+	//inline Array<Type>::Array(Array<Type> array, std::size_t offset, std::size_t length)
+	//{
+	//	_owner = false;
+	//	ranges = array.ranges;
+	//	ranges.begin += offset;
+	//	ranges.end = ranges.begin + length;
+	//	ranges.length = length;
+	//}
 
-	template<class Type>
-	inline Array<Type>::Array(Type * array, std::size_t offset, std::size_t length)
-	{
-		_owner = false;
-		ranges.begin = array + offset;
-		ranges.end = ranges.begin + length;
-		ranges.length = length;
-	}
+	//template<class Type>
+	//inline Array<Type>::Array(Type * array, std::size_t offset, std::size_t length)
+	//{
+	//	_owner = false;
+	//	ranges.begin = array + offset;
+	//	ranges.end = ranges.begin + length;
+	//	ranges.length = length;
+	//}
 
-	template<class Type>
-	inline Array<Type>::Array() : ranges({ nullptr, nullptr, 0 }), _owner(false)
-	{
-	}
+	//template<class Type>
+	//inline Array<Type>::Array() : ranges({ nullptr, nullptr, 0 }), _owner(false)
+	//{
+	//}
 
-	template<class Type>
-	inline Array<Type>::~Array()
-	{
-		if (_owner && ranges.begin != nullptr) delete[] ranges.begin;
-	}
+	//template<class Type>
+	//inline Array<Type>::~Array()
+	//{
+	//	if (_owner && ranges.begin != nullptr) delete[] ranges.begin;
+	//}
 
-	template<class Type>
-	inline Type * Array<Type>::data()
-	{
-		return ranges.begin;
-	}
+	//template<class Type>
+	//inline Type * Array<Type>::data()
+	//{
+	//	return ranges.begin;
+	//}
 
-	template<class Type>
-	inline Type & Array<Type>::operator[](std::size_t i)
-	{
-		return ranges.begin[i];
-	}
+	//template<class Type>
+	//inline Type & Array<Type>::operator[](std::size_t i)
+	//{
+	//	return ranges.begin[i];
+	//}
 
-	template<class Type>
-	inline const std::size_t & Array<Type>::length()
-	{
-		return ranges.length;
-	}
+	//template<class Type>
+	//inline const std::size_t & Array<Type>::length()
+	//{
+	//	return ranges.length;
+	//}
 
-	template<class Type>
-	inline std::size_t Array<Type>::indexof(const Type * buffer, std::size_t length, std::size_t offset)
-	{
-		Type * res = std::search(ranges.begin + offset, ranges.begin + ranges.length, buffer, buffer + length);
-		return res != (ranges.begin + ranges.length) ? (res - ranges.begin) : -1;
-	}
+	//template<class Type>
+	//inline std::size_t Array<Type>::indexof(const Type * buffer, std::size_t length, std::size_t offset)
+	//{
+	//	Type * res = std::search(ranges.begin + offset, ranges.begin + ranges.length, buffer, buffer + length);
+	//	return res != (ranges.begin + ranges.length) ? (res - ranges.begin) : -1;
+	//}
 
-	template<class Type>
-	inline std::size_t Array<Type>::indexof(std::string string, std::size_t offset)
-	{
-		Type * res = std::search(ranges.begin + offset, ranges.begin + ranges.length, string.begin(), string.end());
-		return res != (ranges.begin + ranges.length) ? (res - ranges.begin) : -1;
-	}
+	//template<class Type>
+	//inline std::size_t Array<Type>::indexof(std::string string, std::size_t offset)
+	//{
+	//	Type * res = std::search(ranges.begin + offset, ranges.begin + ranges.length, string.begin(), string.end());
+	//	return res != (ranges.begin + ranges.length) ? (res - ranges.begin) : -1;
+	//}
 
-	template<class Type>
-	inline const Array<Type> & Array<Type>::operator=(Array && right)
-	{
-		ranges = right.ranges;
-		ranges.begin = new Type[ranges.length];
-		ranges.end = ranges.begin + ranges.length;
-		_owner = true;
-		memcpy(ranges.begin, right.ranges.begin, right.ranges.length);
-		return *this;
-	}
+	//template<class Type>
+	//inline const Array<Type> & Array<Type>::operator=(Array && right)
+	//{
+	//	ranges = right.ranges;
+	//	ranges.begin = new Type[ranges.length];
+	//	ranges.end = ranges.begin + ranges.length;
+	//	_owner = true;
+	//	memcpy(ranges.begin, right.ranges.begin, right.ranges.length);
+	//	return *this;
+	//}
 
-	template<class Type>
-	inline RotateIterator<Type> Array<Type>::begin()
-	{
-		return RotateIterator<Type>(ranges);
-	}
+	//template<class Type>
+	//inline RotateIterator<Type> Array<Type>::begin()
+	//{
+	//	return RotateIterator<Type>(ranges);
+	//}
 
-	template<class Type>
-	inline RotateIterator<Type> Array<Type>::end()
-	{
-		return RotateIterator<Type>(ranges, ranges.end);
-	}
+	//template<class Type>
+	//inline RotateIterator<Type> Array<Type>::end()
+	//{
+	//	return RotateIterator<Type>(ranges, ranges.end);
+	//}
 
 	template<class Type>
 	RotateIterator<Type>::RotateIterator(Ranges<Type> & ranges) : ranges(&ranges), pos(ranges.begin), counter(0)

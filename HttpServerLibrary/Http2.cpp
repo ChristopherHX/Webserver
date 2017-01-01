@@ -19,10 +19,10 @@
 #define mainsymbol "?requesthandler@@YAXAEAUConnection@Http2@@AEAUStream@2@AEBVpath@v1@filesystem@experimental@std@@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@8@3@Z"
 #define deinitsymbol "?deinit@@YAXXZ"
 #else
-#define dlopen(name) dlopen(name,0);
-#define initsymbol "?"
-#define mainsymbol "?"
-#define deinitsymbol "?"
+#define dlopen(name) dlopen(name,RTLD_NOW);
+#define initsymbol "_Z4initv"
+#define mainsymbol "_Z14requesthandlerRN5Http210ConnectionERNS_6StreamERKNSt12experimental10filesystem2v17__cxx114pathERKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEESI_"
+#define deinitsymbol "_Z6deinitv"
 #endif
 
 using namespace Http2;
@@ -52,13 +52,11 @@ std::pair<fs::path, std::string> Http2::MimeTypeTable[] = {
 
 bool StreamSearch(const Stream & stream, uint32_t streamIndentifier)
 {
-	return stream.streamIndentifier == streamIndentifier;
+	return stream.indentifier == streamIndentifier;
 }
 
-Http2::Server::Server(const std::experimental::filesystem::path & certroot, const std::experimental::filesystem::path & rootpath) : conhandler(/*std::thread::hardware_concurrency()*/1), running(true), connections(20), rootpath(rootpath), libs(10)
+Http2::Server::Server(const std::experimental::filesystem::path & certroot, const std::experimental::filesystem::path & rootpath) : conhandler(/*std::thread::hardware_concurrency()*/4), running(true), rootpath(rootpath)
 {
-	connectionsend = connectionsbegin = connections.begin();
-	libsend = libs.begin();
 #ifdef _WIN32
 	{
 		WSADATA wsaData;
@@ -75,10 +73,10 @@ Http2::Server::Server(const std::experimental::filesystem::path & certroot, cons
 		OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, nullptr);
 		sslctx = SSL_CTX_new(TLS_server_method());
 		if (SSL_CTX_use_certificate_chain_file(sslctx, publicchain.u8string().data()) < 0) {
-			throw std::runtime_error(u8"Der Öffentlicher Schlüssel konnte nicht gelesen werden");
+			throw std::runtime_error(u8"Der Ã–ffentlicher SchlÃ¼ssel konnte nicht gelesen werden");
 		}
 		if (SSL_CTX_use_PrivateKey_file(sslctx, privatekey.u8string().data(), SSL_FILETYPE_PEM) < 0) {
-			throw std::runtime_error(u8"Der Privater Schlüssel konnte nicht gelesen werden");
+			throw std::runtime_error(u8"Der Privater SchlÃ¼ssel konnte nicht gelesen werden");
 		}
 	}
 	SSL_CTX_set_alpn_select_cb(sslctx, [](SSL * ssl, const unsigned char ** out, unsigned char * outlen, const unsigned char * in, unsigned int inlen, void * args) -> int
@@ -114,7 +112,7 @@ Http2::Server::Server(const std::experimental::filesystem::path & certroot, cons
 	}
 	FD_ZERO(&sockets);
 	FD_SET(ssocket, &sockets);
-	for (int i = 0; i < conhandler.length(); ++i)
+	for (int i = 0; i < conhandler.size(); ++i)
 	{
 		conhandler[i] = std::thread(&Server::connectionshandler, this);
 	}
@@ -123,16 +121,15 @@ Http2::Server::Server(const std::experimental::filesystem::path & certroot, cons
 Server::~Server()
 {
 	running = false;
-	for (int i = 0; i < conhandler.length(); ++i)
+	for (int i = 0; i < conhandler.size(); ++i)
 	{
 		if (conhandler[i].joinable())
 		{
 			conhandler[i].join();
 		}
 	}
-	for (auto conit = connectionsbegin, end = connectionsend; conit != end; ++conit)
+	for (Connection & con : connections)
 	{
-		Connection & con = *conit;
 		if (con.csocket != -1 && con.rmtx.try_lock())
 		{
 			SSL_free(con.cssl);
@@ -140,10 +137,9 @@ Server::~Server()
 			con.rmtx.unlock();
 		}
 	}
-	connectionsbegin = connectionsend;
-	for (auto lib = libs.begin(); lib != libsend; ++lib)
+	for (auto &lib : libs)
 	{
-		void* handle = std::get<1>(*lib);
+		void* handle = std::get<1>(lib);
 		if (handle != 0)
 		{
 			auto deinit = (void(*)())dlsym(handle, deinitsymbol);
@@ -151,7 +147,6 @@ Server::~Server()
 			dlclose(handle);
 		}
 	}
-	libsend = libs.begin();
 }
 
 bool ValidFile(fs::path &filepath, std::string &uri)
@@ -180,6 +175,22 @@ bool ValidFile(fs::path &filepath, std::string &uri)
 	}
 }
 
+Stream & GetStream(std::vector<Stream> &streams, uint32_t streamIndentifier)
+{
+	while (true)
+	{
+		auto res = std::search(streams.begin(), streams.end(), &streamIndentifier, &streamIndentifier + 1, StreamSearch);
+		if (res == streams.end())
+		{
+			streams.push_back(Stream(streamIndentifier));
+		}
+		else
+		{
+			return *res;
+		}
+	}
+}
+
 void Server::connectionshandler()
 {
 	timeval timeout = { 0,0 }, poll = { 0,0 };
@@ -191,48 +202,52 @@ void Server::connectionshandler()
 			select(nfds, &tmp, nullptr, nullptr, &timeout);
 			active = tmp;
 		}
-		if (FD_ISSET(ssocket, &active) && connectionsend->rmtx.try_lock())
+
+		if (FD_ISSET(ssocket, &active))
 		{
-			Connection & con = *connectionsend;
-			socklen_t sockaddr_len = sizeof(sockaddr_in6);
-			con.csocket = accept(ssocket, (sockaddr *)&con.adresse, &sockaddr_len);
-			if (con.csocket == -1)
+			FD_CLR(ssocket, &active);
+			Connection * con;
 			{
-				con.rmtx.unlock();
-				continue;
+				sockaddr_in6 address;
+				socklen_t sockaddr_len = sizeof(sockaddr_in6);
+				uintptr_t csocket = accept(ssocket, (sockaddr *)&address, &sockaddr_len);
+				if (csocket == -1)
+				{
+					continue;
+				}
+				connections.push_back(Connection(csocket, address));
+				con = &*std::search(connections.rbegin(), connections.rend(), &csocket, &csocket + 1, [](const Connection & con, uintptr_t csocket) -> bool {
+					return con.csocket == csocket;
+				});
 			}
-			con.cssl = SSL_new(sslctx);
-			SSL_set_fd(con.cssl, con.csocket);
-			if (SSL_accept(con.cssl) != 1)
+			con->rmtx.lock();
+			con->wmtx.lock();
+			con->cssl = SSL_new(sslctx);
+			SSL_set_fd(con->cssl, con->csocket);
+			if (SSL_accept(con->cssl) != 1)
 			{
-				SSL_free(con.cssl);
-				Http::CloseSocket(con.csocket);
-				con.cssl = 0;
-				con.rmtx.unlock();
+				SSL_free(con->cssl);
+				Http::CloseSocket(con->csocket);
+				con->cssl = 0;
+				con->rmtx.unlock();
+				con->wmtx.unlock();
 				continue;
 			}
 			{
 				char str[INET6_ADDRSTRLEN];
-				inet_ntop(AF_INET6, &(con.adresse.sin6_addr), str, INET6_ADDRSTRLEN);
-				std::cout << str << ":" << ntohs(con.adresse.sin6_port) << " Verbunden\n";
+				inet_ntop(AF_INET6, &(con->address.sin6_addr), str, INET6_ADDRSTRLEN);
+				std::cout << str << ":" << ntohs(con->address.sin6_port) << " Verbunden\n";
 			}
-			con.pending = 0;
-			con.rbuf = Array<uint8_t>(1024);
-			con.routput = con.rinput = con.rbuf.begin();
-			con.wbuf = Array<uint8_t>(1024);
-			con.woutput = con.winput = con.wbuf.begin();
-			con.streams = Array<Stream>(100);
-			con.streamsend = con.streams.begin();
-			FD_SET(con.csocket, &sockets);
-			nfds = std::max(con.csocket + 1, nfds);
-			++connectionsend;
-			con.rmtx.unlock();
+			con->rmtx.unlock();
+			con->wmtx.unlock();
+			FD_SET(con->csocket, &sockets);
+			nfds = std::max(con->csocket + 1, nfds);
 			timeout = { 0,0 };
 		}
 		else
 		{
 			timeout = { 0,1000 };
-			for (auto conit = connectionsbegin, end = connectionsend; conit != end; ++conit)
+			for (auto conit = connections.begin(), end = connections.end(); conit != end; ++conit)
 			{
 				int64_t length;
 				Connection & con = *conit;
@@ -251,15 +266,15 @@ void Server::connectionshandler()
 								Http::CloseSocket(con.csocket);
 								con.cssl = 0;
 							}
-							for (; connectionsbegin != connectionsend && connectionsbegin->csocket == -1; ++connectionsbegin);
 							con.pending = 0;
 							con.wmtx.unlock();
-							continue;
+							con.rmtx.unlock();
+							connections.erase(conit);
+							break;
 						}
 						else
 						{
 							std::cout << "Empfangen:" << length << "\n";
-
 							//FD_CLR(con.csocket, &active);//can evntl crash __i=155 ???
 							con.pending = SSL_pending(con.cssl);
 							con.rinput += length;
@@ -289,6 +304,7 @@ void Server::connectionshandler()
 					frame.flags = (Frame::Flags)*con.routput++;
 					std::reverse_copy(con.routput, con.routput + 4, (unsigned char*)&frame.streamIndentifier);
 					con.routput += 4;
+					Stream & stream = GetStream(con.streams, frame.streamIndentifier);
 					if (frame.type > Frame::Type::CONTINUATION)
 					{
 						con.wmtx.unlock();
@@ -299,7 +315,7 @@ void Server::connectionshandler()
 						while ((con.rinput - con.routput) < frame.length && i >= 0)
 						{
 							std::this_thread::sleep_for(1ms);
-							
+
 							i--;
 						}
 						if (i < 0)
@@ -312,9 +328,10 @@ void Server::connectionshandler()
 								Http::CloseSocket(con.csocket);
 								con.cssl = 0;
 							}
-							for (; connectionsbegin != connectionsend && connectionsbegin->csocket == -1; ++connectionsbegin);
+							con.wmtx.unlock();
 							con.rmtx.unlock();
-							continue;
+							connections.erase(conit);
+							break;
 						}
 					}
 					auto frameend = con.routput + frame.length;
@@ -327,9 +344,7 @@ void Server::connectionshandler()
 					}
 					case Frame::Type::HEADERS:
 					{
-						Stream &stream = *con.streamsend++;
 						stream.state = (((uint8_t)frame.flags & (uint8_t)Frame::Flags::END_STREAM) == (uint8_t)Frame::Flags::END_STREAM) ? Stream::State::half_closed_remote : Stream::State::open;
-						stream.streamIndentifier = frame.streamIndentifier;
 						uint32_t hl = frame.length;
 						if (((uint8_t)frame.flags & (uint8_t)Frame::Flags::PADDED) == (uint8_t)Frame::Flags::PADDED)
 						{
@@ -338,7 +353,7 @@ void Server::connectionshandler()
 						}
 						if (((uint8_t)frame.flags & (uint8_t)Frame::Flags::PRIORITY) == (uint8_t)Frame::Flags::PRIORITY)
 						{
-							std::reverse_copy(con.routput, con.routput + 4, (unsigned char*)&stream.priority.streamDependency);
+							std::reverse_copy(con.routput, con.routput + 4, (unsigned char*)&stream.priority.dependency);
 							con.routput += 4;
 							stream.priority.weight = *con.routput++;
 							hl -= 5;
@@ -347,15 +362,12 @@ void Server::connectionshandler()
 						{
 							continue;
 						}
-						std::cout << "Create Header Array\n";
-						stream.headerlist = Array<std::pair<std::string, std::string>>(20);
-						stream.headerlistend = stream.headerlist.begin();
 						std::cout << "Decode Header Block\n";
-						con.routput = con.hdecoder.Headerblock(con.routput, con.routput + hl, stream.headerlistend);
+						con.routput = con.hdecoder.Headerblock(con.routput, con.routput + hl, stream.headerlist);
 						std::cout << "Decoded Header Block\n";
-						std::string search = ":path";
-						auto res = std::search(stream.headerlist.begin(), stream.headerlistend, &search, &search + 1, HPack::KeySearch<std::string, std::string>);
-						if (res != stream.headerlistend)
+						std::string key = ":path";
+						auto res = std::search(stream.headerlist.begin(), stream.headerlist.end(), &key, &key + 1, HPack::KeySearch<std::string, std::string>);
+						if (res != stream.headerlist.end())
 						{
 							fs::path filepath = rootpath;
 							std::string args, uri;
@@ -373,34 +385,33 @@ void Server::connectionshandler()
 							}
 							std::cout << filepath << "\n";
 							{
-								Utility::Array<std::pair<std::string, std::string>> headerlist(20);
-								Utility::RotateIterator<std::pair<std::string, std::string>> headerlistend = headerlist.begin();
-
+								std::vector<std::pair<std::string, std::string>> headerlist;
 								if (ValidFile(filepath, uri))
 								{
 									fs::path ext = filepath.extension();
-									if (ext == ".dll")
+									if (ext == ".so")
 									{
-										auto res = std::search(libs.begin(), libsend, &filepath, &filepath + 1, [](const std::tuple<std::experimental::filesystem::path, void*, void(*)(Connection&, Stream&, const fs::path&, const std::string&, const std::string&)> & left, const std::experimental::filesystem::path & right) {
+										auto res = std::search(libs.begin(), libs.end(), &filepath, &filepath + 1, [](const std::tuple<std::experimental::filesystem::path, void*, void(*)(Connection&, Stream&, const fs::path&, const std::string&, const std::string&)> & left, const std::experimental::filesystem::path & right) {
 											return std::get<0>(left) == right;
 										});
 										void(*requesthandler)(Connection&, Stream&, const fs::path&, const std::string&, const std::string&);
-										if (res == libsend)
+										if (res == libs.end())
 										{
 											libsmtx.lock();
-											auto &lib = std::get<1>(*libsend);
+											std::tuple<std::experimental::filesystem::path, void*, void(*)(Connection&, Stream&, const std::experimental::filesystem::path&, const std::string&, const std::string&)> entry;
+											auto &lib = std::get<1>(entry);
 											lib = dlopen(filepath.c_str());
 											auto init = (void(*)())dlsym(lib, initsymbol);
 											if (init != nullptr) init();
-											requesthandler = std::get<2>(*libsend) = (void(*)(Connection&, Stream&, const fs::path&, const std::string&, const std::string&))dlsym(lib, mainsymbol);
+											requesthandler = std::get<2>(entry) = (void(*)(Connection&, Stream&, const fs::path&, const std::string&, const std::string&))dlsym(lib, mainsymbol);
 											if (requesthandler == nullptr)
 											{
 												dlclose(lib);
 												libsmtx.unlock();
-												throw std::runtime_error(u8"Datei kann nicht ausgeführt werden");
+												throw std::runtime_error(u8"Datei kann nicht ausgefï¿½hrt werden");
 											}
-											std::get<0>(*libsend) = filepath;
-											++libsend;
+											std::get<0>(entry) = filepath;
+											libs.push_back(std::move(entry));
 											libsmtx.unlock();
 										}
 										else
@@ -411,21 +422,25 @@ void Server::connectionshandler()
 									}
 									else
 									{
-										search = ":method";
-										res = std::search(stream.headerlist.begin(), stream.headerlistend, &search, &search + 1, HPack::KeySearch<std::string, std::string>);
-										if (res != stream.headerlistend && (res->second == Http::Get || res->second == Http::Head))
+										key = ":method";
+										res = std::search(stream.headerlist.begin(), stream.headerlist.end(), &key, &key + 1, HPack::KeySearch<std::string, std::string>);
+										if (res != stream.headerlist.end() && (res->second == Http::Get || res->second == Http::Head))
 										{
 											{
 												std::cout << res->second << "\n";
-												Utility::Array<char> buf(128);
+												std::vector<char> buf(128);
 												time_t date = fs::file_time_type::clock::to_time_t(fs::last_write_time(filepath));
-												strftime(buf.data(), buf.length(), "%a, %d %b %Y %H:%M:%S GMT", std::gmtime(&date));
-												search = "if-modified-since";
-												res = std::search(stream.headerlist.begin(), stream.headerlistend, &search, &search + 1, HPack::KeySearch<std::string, std::string>);
-												if (res != stream.headerlistend && res->second == buf.data())
+												strftime(buf.data(), buf.size(), "%a, %d %b %Y %H:%M:%S GMT", std::gmtime(&date));
+												key = "if-modified-since";
+												res = std::search(stream.headerlist.begin(), stream.headerlist.end(), &key, &key + 1, HPack::KeySearch<std::string, std::string>);
+												if (res != stream.headerlist.end() && res->second == buf.data())
 												{
-													*headerlistend++ = { ":status", "304" };
-													con.winput = con.hencoder.Headerblock(con.winput, headerlist.begin(), headerlistend);
+													headerlist.push_back({ ":status", "304" });
+													con.winput += 3;
+													*con.winput++ = (unsigned char)Frame::Type::HEADERS;
+													*con.winput++ = (unsigned char)Frame::Flags::END_HEADERS | (unsigned char)Frame::Flags::END_STREAM;
+													con.winput = std::reverse_copy((unsigned char*)&stream.indentifier, (unsigned char*)&stream.indentifier + 4, con.winput);
+													con.winput = con.hencoder.Headerblock(con.winput, headerlist);
 													{
 														uint32_t l = (con.winput - con.woutput) - 9;
 														std::reverse_copy((unsigned char*)&l, (unsigned char*)&l + 3, con.woutput);
@@ -437,17 +452,17 @@ void Server::connectionshandler()
 													} while (con.woutput != con.winput);
 													break;
 												}
-												*headerlistend++ = { ":status", "200" };
-												*headerlistend++ = { "last-modified", buf.data() };
+												headerlist.push_back({ ":status", "200" });
+												headerlist.push_back({ "last-modified", buf.data() });
 												time(&date);
-												strftime(buf.data(), buf.length(), "%a, %d %b %Y %H:%M:%S GMT", std::gmtime(&date));
-												*headerlistend++ = { "date", buf.data() };
-												*headerlistend++ = { "accept-ranges", "bytes" };
+												strftime(buf.data(), buf.size(), "%a, %d %b %Y %H:%M:%S GMT", std::gmtime(&date));
+												headerlist.push_back({ "date", buf.data() });
+												headerlist.push_back({ "accept-ranges", "bytes" });
 											}
 											uintmax_t offset = 0, length = fs::file_size(filepath);
-											search = "range";
-											res = std::search(stream.headerlist.begin(), stream.headerlistend, &search, &search + 1, HPack::KeySearch<std::string, std::string>);
-											if (res != stream.headerlistend)
+											key = "range";
+											res = std::search(stream.headerlist.begin(), stream.headerlist.end(), &key, &key + 1, HPack::KeySearch<std::string, std::string>);
+											if (res != stream.headerlist.end())
 											{
 												uintmax_t lpos = length - 1;
 												std::istringstream iss(res->second.substr(6));
@@ -465,8 +480,8 @@ void Server::connectionshandler()
 													con.winput += 3;
 													*con.winput++ = (unsigned char)Frame::Type::HEADERS;
 													*con.winput++ = (unsigned char)Frame::Flags::END_HEADERS | (unsigned char)Frame::Flags::END_STREAM;
-													con.winput = std::reverse_copy((unsigned char*)&frame.streamIndentifier, (unsigned char*)&frame.streamIndentifier + sizeof(frame.streamIndentifier), con.winput);
-													con.winput = con.hencoder.Headerblock(con.winput, headerlist.begin(), headerlistend);
+													con.winput = std::reverse_copy((unsigned char*)&stream.indentifier, (unsigned char*)&stream.indentifier + 4, con.winput);
+													con.winput = con.hencoder.Headerblock(con.winput, headerlist);
 													{
 														uint32_t l = (con.winput - con.woutput) - 9;
 														std::reverse_copy((unsigned char*)&l, (unsigned char*)&l + 3, con.woutput);
@@ -478,22 +493,22 @@ void Server::connectionshandler()
 													break;
 												}
 											}
-											*headerlistend++ = { "content-length", std::to_string(length) };
+											headerlist.push_back({ "content-length", std::to_string(length) });
 											{
-												*headerlistend++ = { "content-type", std::search(MimeTypeTable, MimeTypeTable + (sizeof(MimeTypeTable) / sizeof(std::pair<fs::path, std::string>) - 1), &ext, &ext + 1, HPack::KeySearch<fs::path, std::string>)->second };
+												headerlist.push_back({ "content-type", std::search(MimeTypeTable, MimeTypeTable + (sizeof(MimeTypeTable) / sizeof(std::pair<fs::path, std::string>) - 1), &ext, &ext + 1, HPack::KeySearch<fs::path, std::string>)->second });
 											}
 											if (args == "herunterladen")
 											{
-												*headerlistend++ = { "content-disposition", "attachment" };
+												headerlist.push_back({ "content-disposition", "attachment" });
 											}
 											{
-												std::ifstream stream = std::ifstream(filepath, std::ios::binary);
-												if (!stream.is_open()) throw std::runtime_error(u8"Datei kann nicht geöffnet werden");
+												std::ifstream fstream = std::ifstream(filepath, std::ios::binary);
+												if (!fstream.is_open()) throw std::runtime_error(u8"Datei kann nicht geï¿½ffnet werden");
 												con.winput += 3;
 												*con.winput++ = (unsigned char)Frame::Type::HEADERS;
 												*con.winput++ = (unsigned char)Frame::Flags::END_HEADERS;
-												con.winput = std::reverse_copy((unsigned char*)&frame.streamIndentifier, (unsigned char*)&frame.streamIndentifier + sizeof(frame.streamIndentifier), con.winput);
-												con.winput = con.hencoder.Headerblock(con.winput, headerlist.begin(), headerlistend);
+												con.winput = std::reverse_copy((unsigned char*)&stream.indentifier, (unsigned char*)&stream.indentifier + 4, con.winput);
+												con.winput = con.hencoder.Headerblock(con.winput, headerlist);
 												{
 													uint32_t l = (con.winput - con.woutput) - 9;
 													std::reverse_copy((unsigned char*)&l, (unsigned char*)&l + 3, con.woutput);
@@ -508,8 +523,8 @@ void Server::connectionshandler()
 													con.winput = std::reverse_copy((unsigned char*)&count, (unsigned char*)&count + 3, con.winput);
 													*con.winput++ = (unsigned char)Frame::Type::DATA;
 													*con.winput++ = count == (length - proc) ? (unsigned char)Frame::Flags::END_STREAM : 0;
-													con.winput = std::reverse_copy((unsigned char*)&frame.streamIndentifier, (unsigned char*)&frame.streamIndentifier + 4, con.winput);
-													stream.read((char*)con.winput.Pointer(), count);
+													con.winput = std::reverse_copy((unsigned char*)&stream.indentifier, (unsigned char*)&stream.indentifier + 4, con.winput);
+													fstream.read((char*)con.winput.Pointer(), count);
 													con.winput += count;
 													proc += count;
 													do
@@ -517,59 +532,13 @@ void Server::connectionshandler()
 														con.woutput += SSL_write(con.cssl, con.woutput.Pointer(), con.woutput.PointerReadableLength(con.winput));
 													} while (con.woutput != con.winput);
 												}
-
-												//{
-												//	long long read = 0, sent = 0;
-												//	std::atomic<bool> interrupt(true);
-												//	stream.seekg(offset, std::ios::beg);
-												//	std::thread readfileasync([streamid = &frame.streamIndentifier, &con, &stream, &length, &read, &interrupt]() {
-												//		try {
-												//			long long count;
-												//			while (read < length && interrupt.load())
-												//			{
-												//				if ((count = std::min(length - read, (uint64_t)(con.winput + 9).PointerWriteableLength(con.woutput))) > 0)
-												//				{
-												//					con.winput = std::reverse_copy((unsigned char*)&count, (unsigned char*)&count + 3, con.winput);
-												//					*con.winput++ = (unsigned char)Frame::Type::DATA;
-												//					*con.winput++ = count == (length - read) ? (unsigned char)Frame::Flags::END_STREAM : 0;
-												//					con.winput = std::reverse_copy((unsigned char*)streamid, (unsigned char*)streamid + 4, con.winput);
-												//					stream.read((char*)con.winput.Pointer(), count);
-												//					con.winput += count;
-												//					read += count;
-												//				}
-												//			}
-												//		}
-												//		catch (const std::exception &ex)
-												//		{
-
-												//		}
-												//		interrupt.store(false);
-												//	});
-												//	long long count;
-												//	while (sent < length && interrupt.load() || con.woutput != con.winput)
-												//	{
-												//		if ((count = con.woutput.PointerReadableLength(con.winput)) > 0)
-												//		{
-												//			if ((count = SSL_write((SSL*)con.cssl, con.woutput.Pointer(), count)) <= 0)
-												//			{
-												//				interrupt.store(false);
-												//				readfileasync.join();
-												//				throw std::runtime_error("RequestBuffer::Send(std::istream &stream, long long offset, long long length) Verbindungs Fehler");
-												//			}
-												//			con.woutput += count;
-												//			sent += count;
-												//		}
-												//	}
-												//	interrupt.store(false);
-												//	readfileasync.join();
-												//}
 											}
 										}
 										//else
 										//{
-										//	search = "content-type";
-										//	res = std::search(stream.headerlist.begin(), stream.headerlistend, &search, &search + 1, HPack::KeySearch<std::string, std::string>);
-										//	if (res != stream.headerlistend)
+										//	key = "content-type";
+										//	res = std::search(stream.headerlist.begin(), stream.headerlist.end(), &key, &key + 1, HPack::KeySearch<std::string, std::string>);
+										//	if (res != stream.headerlist.end())
 										//	{
 										//		struct
 										//		{
@@ -621,16 +590,16 @@ void Server::connectionshandler()
 								}
 								else
 								{
-									*headerlist.begin() = { ":status", "404" };
-									headerlistend = headerlist.begin() + 1;
+									headerlist.clear();
+									headerlist.push_back({ ":status", "404" });
 									con.winput += 3;
 									*con.winput++ = (unsigned char)Frame::Type::HEADERS;
 									*con.winput++ = (unsigned char)Frame::Flags::END_HEADERS | (unsigned char)Frame::Flags::END_STREAM;
-									con.winput = std::reverse_copy((unsigned char*)&frame.streamIndentifier, (unsigned char*)&frame.streamIndentifier + sizeof(frame.streamIndentifier), con.winput);
-									con.winput = con.hencoder.Headerblock(con.winput, headerlist.begin(), headerlistend);
+									con.winput = std::reverse_copy((unsigned char*)&stream.indentifier, (unsigned char*)&stream.indentifier + 4, con.winput);
+									con.winput = con.hencoder.Headerblock(con.winput, headerlist);
 									{
-										uint32_t l = (con.winput - con.woutput) - 9;
-										std::reverse_copy((unsigned char*)&l, (unsigned char*)&l + 3, con.woutput);
+										uint32_t length = (con.winput - con.woutput) - 9;
+										std::reverse_copy((unsigned char*)&length, (unsigned char*)&length + 3, con.woutput);
 									}
 									do
 									{
@@ -642,21 +611,21 @@ void Server::connectionshandler()
 						}
 						else
 						{
-							//__debugbreak();
+
 						}
 						break;
 					}
 					case Frame::Type::PRIORITY:
 					{
-						Stream::Priority &priority = frame.streamIndentifier == 0 ? con.priority : std::search(con.streams.begin(), con.streamsend, &frame.streamIndentifier, &frame.streamIndentifier + 1, StreamSearch)->priority;
-						std::reverse_copy(con.routput, con.routput + 4, (unsigned char*)&priority.streamDependency);
+						Stream::Priority &priority = stream.priority;
+						std::reverse_copy(con.routput, con.routput + 4, (unsigned char*)&priority.dependency);
 						con.routput += 4;
 						priority.weight = *con.routput++;
 						break;
 					}
 					case Frame::Type::RST_STREAM:
 					{
-						con.streams[0].state = Stream::State::closed;
+						stream.state = Stream::State::closed;
 						con.routput += frame.length;
 						break;
 					}
@@ -667,7 +636,7 @@ void Server::connectionshandler()
 						con.winput = std::reverse_copy((unsigned char*)&l, (unsigned char*)&l + 3, con.winput);
 						*con.winput++ = (unsigned char)Frame::Type::SETTINGS;
 						*con.winput++ = (unsigned char)Frame::Flags::ACK;
-						con.winput = std::reverse_copy((unsigned char*)&frame.streamIndentifier, (unsigned char*)&frame.streamIndentifier + 4, con.winput);
+						con.winput = std::reverse_copy((unsigned char*)&stream.indentifier, (unsigned char*)&stream.indentifier + 4, con.winput);
 						do
 						{
 							con.woutput += SSL_write(con.cssl, con.woutput.Pointer(), con.woutput.PointerReadableLength(con.winput));
@@ -690,7 +659,7 @@ void Server::connectionshandler()
 							con.winput = std::reverse_copy((unsigned char*)&frame.length, (unsigned char*)&frame.length + 3, con.winput);
 							*con.winput++ = (unsigned char)Frame::Type::PING;
 							*con.winput++ = (unsigned char)Frame::Flags::ACK;
-							con.winput = std::reverse_copy((unsigned char*)&frame.streamIndentifier, (unsigned char*)&frame.streamIndentifier + sizeof(frame.streamIndentifier), con.winput);
+							con.winput = std::reverse_copy((unsigned char*)&stream.indentifier, (unsigned char*)&stream.indentifier + 4, con.winput);
 							con.winput = std::copy(con.routput, con.routput + frame.length, con.winput);
 							con.routput += frame.length;
 							do
@@ -711,8 +680,9 @@ void Server::connectionshandler()
 							Http::CloseSocket(con.csocket);
 							con.cssl = 0;
 						}
-						for (; connectionsbegin != connectionsend && connectionsbegin->csocket == -1; ++connectionsbegin);
+						con.wmtx.unlock();
 						con.rmtx.unlock();
+						connections.erase(conit);
 						break;
 					}
 					case Frame::Type::WINDOW_UPDATE:
@@ -741,4 +711,76 @@ void Server::connectionshandler()
 			}
 		}
 	}
+}
+
+Http2::Stream::Stream(uint32_t indentifier)
+{
+	this->indentifier = indentifier;
+	this->state = State::idle;
+}
+
+Http2::Connection::Connection(uintptr_t csocket, sockaddr_in6 address)
+{
+	this->csocket = csocket;
+	this->address = address;
+	this->rbuf.resize(1024);
+	this->rranges = { this->rbuf.data(), this->rbuf.data() + this->rbuf.size(), this->rbuf.size() };
+	this->wbuf.resize(1024);
+	this->wranges = { this->wbuf.data(), this->wbuf.data() + this->wbuf.size(), this->wbuf.size() };
+	this->pending = 0;
+}
+
+Http2::Connection::Connection(Http2::Connection&& con)
+{
+	this->address = con.address;
+	this->csocket = con.csocket;
+	this->cssl = con.cssl;
+	this->hdecoder = con.hdecoder;
+	this->hencoder = con.hencoder;
+	this->pending = con.pending;
+	this->rbuf = std::move(con.rbuf);
+	this->wbuf = std::move(con.wbuf);
+	this->rranges = { this->rbuf.data(), this->rbuf.data() + this->rbuf.size(), this->rbuf.size() };
+	this->routput = this->rinput = Utility::RotateIterator<uint8_t>(this->rranges);
+	this->wranges = { this->wbuf.data(), this->wbuf.data() + this->wbuf.size(), this->wbuf.size() };
+	this->woutput = this->winput = Utility::RotateIterator<uint8_t>(this->wranges);
+}
+
+Http2::Connection::Connection(const Http2::Connection& con)
+{
+	this->address = con.address;
+	this->csocket = con.csocket;
+	this->cssl = con.cssl;
+	this->hdecoder = con.hdecoder;
+	this->hencoder = con.hencoder;
+	this->pending = con.pending;
+	this->rbuf = con.rbuf;
+	this->wbuf = con.wbuf;
+	this->rranges = { this->rbuf.data(), this->rbuf.data() + this->rbuf.size(), this->rbuf.size() };
+	this->routput = this->rinput = Utility::RotateIterator<uint8_t>(this->rranges);
+	this->wranges = { this->wbuf.data(), this->wbuf.data() + this->wbuf.size(), this->wbuf.size() };
+	this->woutput = this->winput = Utility::RotateIterator<uint8_t>(this->wranges);
+}
+
+Connection & Http2::Connection::operator=(const Connection & con)
+{
+	this->address = con.address;
+	this->csocket = con.csocket;
+	this->cssl = con.cssl;
+	this->hdecoder = con.hdecoder;
+	this->hencoder = con.hencoder;
+	this->pending = con.pending;
+	this->rbuf = con.rbuf;
+	this->wbuf = con.wbuf;
+	this->rranges = { this->rbuf.data(), this->rbuf.data() + this->rbuf.size(), this->rbuf.size() };
+	this->routput = this->rinput = Utility::RotateIterator<uint8_t>(this->rranges);
+	this->wranges = { this->wbuf.data(), this->wbuf.data() + this->wbuf.size(), this->wbuf.size() };
+	this->woutput = this->winput = Utility::RotateIterator<uint8_t>(this->wranges);
+	return *this;
+}
+
+Http2::Stream::Priority::Priority()
+{
+	dependency = 0;
+	weight = 0;
 }

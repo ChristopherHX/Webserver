@@ -49,7 +49,7 @@ namespace Http
 	{
 	private:
 		uintptr_t socket;
-		Utility::Array<char> buffer;
+		std::vector<char> buffer;
 		long long capacity;
 		std::string client;
 		void * ssl;

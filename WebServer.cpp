@@ -23,19 +23,18 @@ int main(int argc, const char** argv)
 	#endif
 		fs::path p = buf;
 		delete[] buf;
-		p = p.parent_path().parent_path().parent_path();
-		//std::fstream fs(p.parent_path() / "Serverlog.txt");
+		p = p.parent_path().parent_path().parent_path()
+#ifdef _WIN32
+			.parent_path()
+#endif
+			;
 		try {
-			//fs << "Server wird gestartet..\r\n";///etc/letsencrypt/live/p4fdf5699.dip0.t-ipconnect.de/
-			Http2::Server server(p, "/");
-			//fs << "Server ist gestartet..\r\n";
+			Http2::Server server(p, ".");//etc/letsencrypt/live/p4fdf5699.dip0.t-ipconnect.de/
 			std::string command;
 			std::getline(std::cin, command);
-			//fs << "Server wurde beendet durch:\"" << command << "\r\n";
 		}
 		catch (std::exception &ex){
 			std::cout << "Error:" << ex.what() << "\r\n";
-			//fs.close();
 		}
 		return 0;
 	

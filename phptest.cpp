@@ -91,7 +91,7 @@ static void sapi_pri_register_variables(zval *track_vars_array) /* {{{ */
 	}
 }
 
-static void sapi_pri_log_message(char *message/*, int syslog_type_int*/) /* {{{ */
+static void sapi_pri_log_message(char *message) /* {{{ */
 {
 	std::cout << "PHP Message: '" << message << "'\n";
 }
@@ -194,7 +194,8 @@ int main(int argc, char ** argv)
 		delete[] pri_sapi_module.ini_entries;
 		return 1;
 	}
-
+	
+	std::cout << "SG(server_context) = (void*)\"Hallo Server\"\n";
 	SG(server_context) = (void*)"Hallo Server";
 
 	zend_file_handle file_handle;
@@ -203,6 +204,7 @@ int main(int argc, char ** argv)
 	file_handle.type = ZEND_HANDLE_FP;
 	file_handle.opened_path = NULL;
 	file_handle.free_filename = 0;
+std::cout << "PHP soll gestartet werden\n";
 	if (php_request_startup() == FAILURE) {
 
 	}

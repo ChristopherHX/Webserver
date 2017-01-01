@@ -111,13 +111,6 @@ void Server::Starten(const int httpPort, const int httpsPort)
 			}, &i);
 			return;
 		}
-		//SSL_CTX_set_alpn_select_cb(ctx, [](SSL * ssl, const unsigned char ** out, unsigned char * outlen, const unsigned char * in, unsigned int inlen, void * args) -> int 
-		//{
-		//	//*out = in;//Http/2
-		//	//*outlen = 3;
-		//	SSL_select_next_proto((unsigned char **)out, outlen, in, inlen, in, inlen);
-		//	return 0;
-		//}, nullptr);
 
 		CreateServerSocket(httpsServerSocket, httpsPort > 0 ? httpsPort : 433);
 	}
@@ -127,7 +120,7 @@ void Server::Starten(const int httpPort, const int httpsPort)
 		return;
 	}
 
-	//CreateServerSocket(httpServerSocket, httpPort > 0 ? httpPort : 80);
+	CreateServerSocket(httpServerSocket, httpPort > 0 ? httpPort : 80);
 	servermainstop.store(true);
 	servermain = (void*)new std::thread([this, ctx]() {
 		uintptr_t nfds = std::max(httpServerSocket, httpsServerSocket) + 1;
@@ -157,150 +150,9 @@ void Server::Starten(const int httpPort, const int httpsPort)
 						SSL_set_fd(ssl, clientSocket);
 						SSL_accept(ssl);
 					}
-					Utility::Array<char> client(clientAdresse_len + 6);
-					snprintf(client.data(), client.length(), "%s:%hu", inet_ntop(AF_INET, &clientAdresse.sin_addr, Utility::Array<char>(clientAdresse_len).data(), clientAdresse_len), ntohs(clientAdresse.sin_port));
+					std::vector<char> client(clientAdresse_len + 6);
+					snprintf(client.data(), client.size(), "%s:%hu", inet_ntop(AF_INET, &clientAdresse.sin_addr, std::vector<char>(clientAdresse_len).data(), clientAdresse_len), ntohs(clientAdresse.sin_port));
 					std::thread(&Server::processRequest, this, std::unique_ptr<RequestBuffer>(new RequestBuffer(clientSocket, 1 << 14, std::string(client.data()), ssl, rootfolder))).detach();
-					//		Http2::Stream stream(clientSocket, (uintptr_t)ssl);
-					//		Http2::Frame frame;
-					//		while (clientSocket != -1)
-					//		{
-					//			stream >> frame;
-					//			switch (frame.Type)
-					//			{
-					//			case Http2::Frame::Type::HEADERS:
-					//			{
-					//				std::unordered_multimap<std::string, std::string> headerlist;
-					//				Http2::Headers header({frame});
-					//				stream >> header;
-					//				uint32_t hl = frame.length - header.padLength - (header.padLength == 0 ? 0 : 1) - ((frame.flags & 0x20) == 0 ? 0 : 5);
-					//				uint8_t index;
-					//				for (Http2::RotateIterator &pos = stream.begin(), end = pos + hl; pos != end;)
-					//				{
-					//					if ((*pos & 0x80) != 0)
-					//					{
-					//						index = *pos & 0x7F;
-					//						auto & el = Http2::StaticTable[index];
-					//						headerlist.insert(std::pair<std::string, std::string>(el.key, el.value));
-					//						++pos;
-					//					}
-					//					else if ((*pos & 0x40) != 0)
-					//					{
-					//						index = *pos & 0x3F;
-					//						++pos;
-					//						std::string key;
-					//						if (index == 0)
-					//						{
-					//							uint8_t length = *pos & 0x7F;
-					//							key = ((*pos++ & 0x80) != 0) ? Http2::HuffmanDecoder(pos, length) : std::string(pos, pos + length);
-					//							pos += length;
-					//						}
-					//						else
-					//						{
-					//							key = Http2::StaticTable[index].key;
-					//						}
-					//						uint8_t length = *pos & 0x7F;
-					//						headerlist.insert(std::pair<std::string, std::string>(key, ((*pos++ & 0x80) != 0) ? Http2::HuffmanDecoder(pos, length) : std::string(pos, pos + length)));
-					//						pos += length;
-					//					}
-					//					else if ((*pos & 0x20) != 0)
-					//					{
-					//						uint8_t maxsize = *pos & 0x1F;
-					//						++pos;
-
-					//					}
-					//					else if ((*pos & 0x10) != 0)
-					//					{
-					//						index = *pos++ & 0x0F;
-					//						std::string key;
-					//						if (index == 0)
-					//						{
-					//							uint8_t length = *pos & 0x7F;
-					//							key = ((*pos++ & 0x80) != 0) ? Http2::HuffmanDecoder(pos, length) : std::string(pos, pos + length);
-					//							pos += length;
-					//						}
-					//						else
-					//						{
-					//							key = Http2::StaticTable[index].key;
-					//						}
-					//						uint8_t length = *pos & 0x7F;
-					//						headerlist.insert(std::pair<std::string, std::string>(key, ((*pos++ & 0x80) != 0) ? Http2::HuffmanDecoder(pos, length) : std::string(pos, pos + length)));
-					//						pos += length;
-					//					}
-					//					else
-					//					{
-					//						index = *pos & 0x0F;
-					//						++pos;
-					//						std::string key;
-					//						if (index == 0)
-					//						{
-					//							uint8_t length = *pos & 0x7F;
-					//							key = ((*pos++ & 0x80) != 0) ? Http2::HuffmanDecoder(pos, length) : std::string(pos, pos + length);
-					//							pos += length;
-					//						}
-					//						else
-					//						{
-					//							key = Http2::StaticTable[index].key;
-					//						}
-					//						uint8_t length = *pos & 0x7F;
-					//						headerlist.insert(std::pair<std::string, std::string>(key, ((*pos++ & 0x80) != 0) ? Http2::HuffmanDecoder(pos, length) : std::string(pos, pos + length)));
-					//						pos += length;
-					//					}
-					//				}
-					//				Array<unsigned char> buf(4);
-					//				unsigned char * data = buf.data();
-					//				*data++ = 0x80 | 8;
-					//				//*data++ = 0x80 | 7;
-					//				*data++ = 0x40 | 28;
-					//				*data++ = 0x80 | 0x1;
-					//				*data++ = 0x07;
-
-					//				//std::string len(std::to_string(0));
-					//				//*data++ = len.length();
-					//				//memcpy(data, len.data(), len.length());
-					//				//data += len.length();
-					//				Http2::RotateIterator::Ranges ranges;
-					//				ranges.begin = buf.data();
-					//				ranges.capacity = buf.length();
-					//				ranges.end = ranges.begin + ranges.capacity;
-					//				header.headerBlockFragment = Http2::RotateIterator(ranges, ranges.begin);
-					//				frame.length = 4;
-					//				frame.flags = 0x4 | 0x1;
-					//				stream << frame;
-					//				stream << header;
-
-					//				//stream << data;
-					//			}
-					//			break;
-					//			case Http2::Frame::Type::SETTINGS:
-					//			{
-					//				Array<Http2::Setting> settings(frame.length / 6);
-					//				for (int i = 0; i < settings.length(); i++)
-					//				{
-					//					stream >> settings[i];
-					//				}
-					//				frame.length = 0;
-					//				frame.flags = 0x01;
-					//				frame.Type = Http2::Frame::Type::SETTINGS;
-					//				stream << frame;
-					//			}
-					//			break;
-					//			case Http2::Frame::Type::GOAWAY:
-					//			{
-					//				Http::CloseSocket(clientSocket);
-					//			}
-					//			break;
-					//			default:
-					//				stream.Release(frame.length);
-					//			break;
-					//			}
-					//		}
-					//	}
-					//}
-					//			}
-					//			catch (const std::exception &ex)
-					//			{
-					//				
-					//			}
 				}
 			}
 		}
@@ -420,9 +272,9 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 					{
 						response["Accept-Ranges"] = "bytes";
 						{
-							Utility::Array<char> buf(128);
+							std::vector<char> buf(128);
 							time_t date = fs::file_time_type::clock::to_time_t(fs::last_write_time(filepath));
-							strftime(buf.data(), buf.length(), "%a, %d-%b-%G %H:%M:%S GMT", std::gmtime(&date));
+							strftime(buf.data(), buf.size(), "%a, %d-%b-%G %H:%M:%S GMT", std::gmtime(&date));
 							if (reqest.Exists("If-Modified-Since") && reqest["If-Modified-Since"].toString() == buf.data())
 							{
 								response.status = NotModified;
@@ -431,7 +283,7 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 							}
 							response["Last-Modified"] = buf.data();
 							time(&date);
-							strftime(buf.data(), buf.length(), "%a, %d-%b-%G %H:%M:%S GMT", std::gmtime(&date));
+							strftime(buf.data(), buf.size(), "%a, %d-%b-%G %H:%M:%S GMT", std::gmtime(&date));
 							response["Date"] = buf.data();
 						}
 						uintmax_t offset = 0, length = fs::file_size(filepath);

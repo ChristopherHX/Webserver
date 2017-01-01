@@ -72,34 +72,10 @@ namespace Http2
 		uint32_t value;
 	};
 
-	//class Stream
-	//{
-	//private:
-	//	Array<unsigned char> _array;
-	//	RotateIterator::Ranges ranges;
-	//	RotateIterator inputiterator;
-	//	RotateIterator outputiterator;
-	//	void* receiver;
-	//	bool running;
-	//	uintptr_t csocket;
-	//	uintptr_t cssl;
-	//public:
-	//	Stream(uintptr_t csocket, uintptr_t cssl);
-	//	~Stream();
-	//	Stream & operator >> (Frame &frame);
-	//	Stream & operator << (const Frame &frame);
-	//	Stream & operator >> (Headers &headers);
-	//	Stream & operator >> (HeadersPadded & headers);
-	//	Stream & operator << (const Headers &headers);
-	//	Stream & operator >> (Setting &setting);
-	//	Stream & operator << (const Setting &setting);
-	//	void Release(long long count);
-	//	RotateIterator &begin();
-	//	RotateIterator end();
-	//};
-
-	struct Stream
+	class Stream
 	{
+	public:
+		Stream(uint32_t indentifier);
 		enum class State
 		{
 			idle,
@@ -110,34 +86,39 @@ namespace Http2
 			half_closed_remote,
 			closed
 		};
-		struct Priority
+		class Priority
 		{
-			uint32_t streamDependency;
+		public:
+			Priority();
+			uint32_t dependency;
 			uint8_t weight;
 		};
 		State state;
 		Priority priority;
-		uint32_t streamIndentifier;
-		Utility::Array<std::pair<std::string, std::string>> headerlist;
-		Utility::RotateIterator<std::pair<std::string, std::string>> headerlistend;
+		uint32_t indentifier;
+		std::vector<std::pair<std::string, std::string>> headerlist;
 		std::function<void(Frame&)> datahandler;
 	};
 
-	struct Connection
+	class Connection
 	{
+	public:
+		Connection(uintptr_t csocket, sockaddr_in6 address);
+		Connection(Http2::Connection && con);
+		Connection(const Http2::Connection & con);
 		std::mutex rmtx, wmtx;
 		uintptr_t csocket;
-		sockaddr_in6 adresse;
+		sockaddr_in6 address;
 		SSL * cssl;
 		int pending;
-		Stream::Priority priority;
-		Utility::Array<uint8_t> rbuf, wbuf;
+		std::vector<uint8_t> rbuf, wbuf;
+		Utility::Ranges<uint8_t> rranges, wranges;
 		Utility::RotateIterator<uint8_t> rinput, routput;
 		Utility::RotateIterator<uint8_t> winput, woutput;
-		Utility::Array<Stream> streams;
-		Utility::RotateIterator<Stream> streamsend;
+		std::vector<Stream> streams;
 		HPack::Encoder hencoder;
 		HPack::Decoder hdecoder;
+		Connection& operator=(const Connection&con);
 	};
 
 	class Server
@@ -146,14 +127,11 @@ namespace Http2
 		SSL_CTX* sslctx;
 		uintptr_t ssocket;
 		fd_set sockets, active;
-		Utility::Array<std::thread> conhandler;
-		Utility::Array<Connection> connections;
-		Utility::RotateIterator<Connection> connectionsbegin;
-		Utility::RotateIterator<Connection> connectionsend;
+		std::vector<std::thread> conhandler;
+		std::vector<Connection> connections;
 		bool running;
 		std::experimental::filesystem::path rootpath;
-		Utility::Array<std::tuple<std::experimental::filesystem::path, void*, void(*)(Connection&, Stream&, const std::experimental::filesystem::path&, const std::string&, const std::string&)>> libs;
-		Utility::RotateIterator<std::tuple<std::experimental::filesystem::path, void*, void(*)(Connection&, Stream&, const std::experimental::filesystem::path&, const std::string&, const std::string&)>> libsend;
+		std::vector<std::tuple<std::experimental::filesystem::path, void*, void(*)(Connection&, Stream&, const std::experimental::filesystem::path&, const std::string&, const std::string&)>> libs;
 		std::mutex libsmtx;
 		void connectionshandler();
 	public:

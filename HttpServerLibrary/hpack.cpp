@@ -1,7 +1,6 @@
 #include "hpack.h"
 #include "Array.h"
 
-#include <sstream>
 
 using namespace Http2::HPack;
 
@@ -329,100 +328,18 @@ std::pair<std::string, std::string> Http2::HPack::StaticTable[] = {
 	{ "www-authenticate" , "" }
 };
 
-//Http2::HPack::Coder::Coder()
-//{
-//	dynamictable = Utility::Array<std::pair<std::string, std::string>>(100);
-//	ClearDynamicTable();
-//}
-//
-//void Http2::HPack::Coder::ClearDynamicTable()
-//{
-//	dynamictableend = dynamictable.begin();
-//}
-
-Http2::HPack::Encoder::Encoder() : dynamictable(50) // : Coder()
+Http2::HPack::Encoder::Encoder()
 {
-	ClearDynamicTable();
 }
 
 void Http2::HPack::Encoder::ClearDynamicTable()
 {
-	dynamictableend = dynamictable.begin();
+	dynamictable.clear();
 }
 
-void Http2::HPack::Decoder::ClearDynamicTable()
+std::vector<uint8_t> Encoder::Huffman(const std::string & string)
 {
-	dynamictableend = dynamictable.begin();
-}
-
-Utility::RotateIterator<uint8_t> Http2::HPack::Encoder::Headerblock(Utility::RotateIterator<uint8_t> pos, Utility::RotateIterator<std::pair<std::string, std::string>> headerlistbegin, Utility::RotateIterator<std::pair<std::string, std::string>> headerlistend)
-{
-	for (; headerlistbegin != headerlistend; ++headerlistbegin) {
-		auto & entry = *headerlistbegin;
-		auto res = std::search(StaticTable, StaticTable + 61, &entry, &entry + 1);
-		if (res != (StaticTable + 61))
-		{
-			*pos = 0x80;
-			pos = Integer(pos, (res - StaticTable) + 1, 7);
-		}
-		else
-		{
-			auto res = std::search(dynamictable.begin(), dynamictableend, &entry, &entry + 1);
-			if (res != dynamictableend)
-			{
-				*pos = 0x80;
-				pos = Integer(pos, (dynamictableend - res) + 61, 7);
-			}
-			else
-			{
-				*pos = 0x40;
-				auto res = std::search(StaticTable, StaticTable + 61, &entry.first, &entry.first + 1, KeySearch<std::string, std::string>);
-				if (res != (StaticTable + 61))
-				{
-					pos = Integer(pos, (res - StaticTable) + 1, 6);
-				}
-				else
-				{
-					auto res = std::search(dynamictable.begin(), dynamictableend, &entry, &entry + 1);
-					if (res != dynamictableend)
-					{
-						pos = Integer(pos, (dynamictableend - res) + 61, 6);
-					}
-					else
-					{
-						pos = StringH(pos, entry.first);
-					}
-				}
-				pos = StringH(pos, entry.second);
-			}
-		}
-	}
-	return pos;
-}
-
-Utility::RotateIterator<uint8_t> Http2::HPack::Encoder::Integer(Utility::RotateIterator<uint8_t> pos, uint64_t integer, uint8_t bits)
-{
-	uint8_t mask = (1 << bits) - 1;
-	if (integer < mask)
-	{
-		*pos++ = (*pos & ~mask) | integer;
-	}
-	else
-	{
-		*pos++ |= mask;
-		integer -= mask;
-		while (integer >= 128)
-		{
-			*pos++ = (integer % 128) | 128;
-			integer >>= 7;
-		}
-		*pos++ = integer;
-	}
-	return pos;
-}
-
-Utility::RotateIterator<uint8_t> Http2::HPack::Encoder::Huffman(Utility::RotateIterator<uint8_t> pos, const std::string & string)
-{
+	std::vector<uint8_t> hstring;
 	long long  i = 0;
 	uint32_t buf = 0;
 	for (char ch : string)
@@ -431,158 +348,24 @@ Utility::RotateIterator<uint8_t> Http2::HPack::Encoder::Huffman(Utility::RotateI
 		buf |= res.first << (32 - res.second - (i % 8));
 		for (int j = 0; j < (((i % 8) + res.second) >> 3); ++j)
 		{
-			*pos++ = ((uint8_t*)&buf)[3];
+			hstring.push_back(((uint8_t*)&buf)[3]);
 			buf <<= 8;
 		}
 		i += res.second;
 	}
 	if ((i % 8) > 0)
 	{
-		*pos++ = ((uint8_t*)&buf)[3] | ((1 << (8 - (i % 8))) - 1);
+		hstring.push_back(((uint8_t*)&buf)[3] | ((1 << (8 - (i % 8))) - 1));
 	}
-	return pos;
+	return hstring;
 }
 
-Utility::RotateIterator<uint8_t> Http2::HPack::Encoder::String(Utility::RotateIterator<uint8_t> pos, const std::string & source)
+Http2::HPack::Decoder::Decoder()
 {
-	*pos = 0;
-	return std::copy(source.begin(), source.end(), Integer(pos, source.length(), 7));
+
 }
 
-Utility::RotateIterator<uint8_t> Http2::HPack::Encoder::StringH(Utility::RotateIterator<uint8_t> pos, const std::string & source)
+void Http2::HPack::Decoder::ClearDynamicTable()
 {
-	Utility::Array<uint8_t> str(source.length() + 5);
-	Utility::RotateIterator<uint8_t> begin = str.begin(), end = Huffman(begin, source);
-	*pos = 0x80;
-	return std::copy(begin, end, Integer(pos, end - begin, 7));
-}
-
-Http2::HPack::Decoder::Decoder() : dynamictable(50)// : Coder()
-{
-	ClearDynamicTable();
-}
-
-Utility::RotateIterator<uint8_t> Http2::HPack::Decoder::Headerblock(Utility::RotateIterator<uint8_t> pos, Utility::RotateIterator<uint8_t> end, Utility::RotateIterator<std::pair<std::string, std::string>> &headerlistend)
-{
-	while (pos != end)
-	{
-		if ((*pos & 0x80) != 0)
-		{
-			uint64_t index;
-			pos = Integer(pos, index, 7);
-			auto & el = index < 62 ? StaticTable[index - 1] : *(dynamictableend - (index - 61));
-			*headerlistend++ = el;
-		}
-		else if ((*pos & 0x40) != 0)
-		{
-			uint64_t index;
-			pos = Integer(pos, index, 6);
-			std::string key, value;
-			if (index == 0)
-			{
-				pos = String(pos, key);
-			}
-			else
-			{
-				key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictableend - (index - 61))).first;
-			}
-			pos = String(pos, value);
-			*headerlistend++ = *dynamictableend++ = { key, value };
-		}
-		else if ((*pos & 0x20) != 0)
-		{
-			uint64_t maxsize;
-			Integer(pos, maxsize, 5);
-		}
-		else if ((*pos & 0x10) != 0)
-		{
-			uint64_t index;
-			pos = Integer(pos, index, 4);
-			std::string key, value;
-			if (index == 0)
-			{
-				pos = String(pos, key);
-			}
-			else
-			{
-				key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictableend - (index - 61))).first;
-			}
-			pos = String(pos, value);
-			*headerlistend++ = { key, value };
-		}
-		else
-		{
-			uint64_t index;
-			pos = Integer(pos, index, 4);
-			std::string key, value;
-			if (index == 0)
-			{
-				pos = String(pos, key);
-			}
-			else
-			{
-				key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictableend - (index - 61))).first;
-			}
-			pos = String(pos, value);
-			*headerlistend++ = { key, value };
-		}
-		//if (pos > end)
-		//{
-		//	auto & entry = *(con.streamsend->headerlistend - 1);
-		//	auto & entry2 = *(con.streamsend->headerlistend - 2);
-		//	__debugbreak();
-		//}
-	}
-	return pos;
-}
-
-Utility::RotateIterator<uint8_t> Http2::HPack::Decoder::Integer(Utility::RotateIterator<uint8_t> pos, uint64_t & integer, uint8_t bits)
-{
-	integer = *pos & ((1 << bits) - 1);
-	if (integer == ((1 << bits) - 1))
-	{
-		uint64_t pbits = 0;
-		do
-		{
-			integer += (*++pos & 127) << pbits;
-			pbits += 7;
-		} while ((*pos & 128) == 128);
-	}
-	return ++pos;
-}
-
-Utility::RotateIterator<uint8_t> Http2::HPack::Decoder::Huffman(Utility::RotateIterator<uint8_t> pos, std::string & string, long long length)
-{
-	std::ostringstream strs;
-	long long  i = 0, blength = length << 3;
-	while (true)
-	{
-		uint32_t buf = ((pos[i >> 3] << 24) | (pos[(i >> 3) + 1] << 16) | (pos[(i >> 3) + 2] << 8) | pos[(i >> 3) + 3]) << (i % 8);
-		std::pair<uint32_t, uint8_t> *res = std::search(StaticHuffmanTable, StaticHuffmanTable + 256, &buf, &buf + 1, [](const std::pair<uint32_t, uint8_t> & entry, uint32_t buffer) -> bool {
-			uint32_t mask = ~((1 << (32 - entry.second)) - 1);
-			return (entry.first << (32 - entry.second)) == (buffer & mask);
-		});
-		if ((i += res->second) > blength | res >= (StaticHuffmanTable + 256))
-		{
-			string = strs.str();
-			return pos + length;
-		}
-		strs << (char)(res - StaticHuffmanTable);
-	}
-}
-
-Utility::RotateIterator<uint8_t> Http2::HPack::Decoder::String(Utility::RotateIterator<uint8_t> pos, std::string & string)
-{
-	uint64_t length;
-	bool huffmanencoding = (*pos & 0x80) == 0x80;
-	pos = Integer(pos, length, 7);
-	if (huffmanencoding)
-	{
-		return Huffman(pos, string, length);
-	}
-	else
-	{
-		string = std::string(pos, pos + length);
-		return pos += length;
-	}
+	dynamictable.clear();
 }
