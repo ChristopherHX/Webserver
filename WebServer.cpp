@@ -15,7 +15,7 @@ namespace fs = std::experimental::filesystem;
 
 int main(int argc, const char** argv)
 {
-		char * buf = new char[512];
+		/*char * buf = new char[512];
 	#ifdef _WIN32
 		GetModuleFileNameA(NULL, buf, 512);
 	#else
@@ -23,13 +23,9 @@ int main(int argc, const char** argv)
 	#endif
 		fs::path p = buf;
 		delete[] buf;
-		p = p.parent_path().parent_path().parent_path()
-#ifdef _WIN32
-			.parent_path()
-#endif
-			;
+		p = p.parent_path();*/
 		try {
-			Http2::Server server(p, ".");//etc/letsencrypt/live/p4fdf5699.dip0.t-ipconnect.de/
+			Http2::Server server("/etc/letsencrypt/live/p4fdf5699.dip0.t-ipconnect.de", "/home/ubuntu/WebServer-C++/web");//etc/letsencrypt/live/p4fdf5699.dip0.t-ipconnect.de/
 			std::string command;
 			std::getline(std::cin, command);
 		}
@@ -37,7 +33,6 @@ int main(int argc, const char** argv)
 			std::cout << "Error:" << ex.what() << "\r\n";
 		}
 		return 0;
-	
 //    Server server;
 //    std::string command = "start";
 
@@ -54,7 +49,7 @@ int main(int argc, const char** argv)
 //        if(command == "start")
 //        {
 //            server.Starten(80, 443);
-//            std::cout << "Server gestartet.\n";            
+//            std::cout << "Server gestartet.\n";
 //        }
 //        else if(command == "stop")
 //        {
