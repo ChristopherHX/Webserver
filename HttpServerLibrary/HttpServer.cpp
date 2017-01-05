@@ -131,7 +131,6 @@ void Server::Starten(const int httpPort, const int httpsPort)
 		FD_ZERO(&sockets);
 		while (servermainstop.load())
 		{
-			//try {
 			timeout.tv_sec = 5;
 			timeout.tv_usec = 0;
 			if (httpServerSocket != -1)	FD_SET(httpServerSocket, &sockets);

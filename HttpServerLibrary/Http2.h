@@ -28,6 +28,19 @@ namespace Http2
 {
 	extern std::pair<std::experimental::filesystem::path, std::string> MimeTypeTable[];
 
+	template<class T1, class T2>
+	class FindKey
+	{
+	private:
+		const T1 &key;
+	public:
+		FindKey(const T1& key) : key(key) {}
+		bool operator()(const std::pair<T1, T2> &pair)
+		{
+			return pair.first == key;
+		}
+	};
+
 	struct Frame
 	{
 		enum class Flags : uint8_t
@@ -57,25 +70,19 @@ namespace Http2
 		uint32_t streamIndentifier;
 	};
 
-	struct Setting
+	enum class Settings : uint16_t
 	{
-		enum class Id : uint16_t
-		{
-			SETTINGS_HEADER_TABLE_SIZE = 0x1,
-			SETTINGS_ENABLE_PUSH = 0x2,
-			SETTINGS_MAX_CONCURRENT_STREAMS = 0x3,
-			SETTINGS_INITIAL_WINDOW_SIZE = 0x4,
-			SETTINGS_MAX_FRAME_SIZE = 0x5,
-			SETTINGS_MAX_HEADER_LIST_SIZE = 0x6
-		};
-		Id id;
-		uint32_t value;
+		HEADER_TABLE_SIZE = 0x0,
+		ENABLE_PUSH = 0x1,
+		MAX_CONCURRENT_STREAMS = 0x2,
+		INITIAL_WINDOW_SIZE = 0x3,
+		MAX_FRAME_SIZE = 0x4,
+		MAX_HEADER_LIST_SIZE = 0x5
 	};
 
 	class Stream
 	{
 	public:
-		Stream(uint32_t indentifier);
 		enum class State
 		{
 			idle,
@@ -98,14 +105,13 @@ namespace Http2
 		uint32_t indentifier;
 		std::vector<std::pair<std::string, std::string>> headerlist;
 		std::function<void(Frame&)> datahandler;
+
+		Stream(uint32_t indentifier);
 	};
 
 	class Connection
 	{
 	public:
-		Connection(uintptr_t csocket, sockaddr_in6 address);
-		Connection(Http2::Connection && con);
-		Connection(const Http2::Connection & con);
 		std::mutex rmtx, wmtx;
 		uintptr_t csocket;
 		sockaddr_in6 address;
@@ -118,24 +124,34 @@ namespace Http2
 		std::vector<Stream> streams;
 		HPack::Encoder hencoder;
 		HPack::Decoder hdecoder;
-		Connection& operator=(const Connection&con);
+		uint32_t settings[6];
+
+		Connection(uintptr_t csocket, sockaddr_in6 address);
+		Connection(Http2::Connection && con);
+		Connection(const Http2::Connection & con);
+		~Connection();
+		Connection& operator=(const Connection & con);
 	};
+
+	bool FindFile(std::experimental::filesystem::path & filepath, std::string & uri);
 
 	class Server
 	{
 	private:
+		bool running;
 		SSL_CTX* sslctx;
 		uintptr_t ssocket;
+		std::mutex libsmtx;
 		fd_set sockets, active;
+		void connectionshandler();
 		std::vector<std::thread> conhandler;
 		std::vector<Connection> connections;
-		bool running;
 		std::experimental::filesystem::path rootpath;
-		std::vector<std::tuple<std::experimental::filesystem::path, void*, void(*)(Connection&, Stream&, const std::experimental::filesystem::path&, const std::string&, const std::string&)>> libs;
-		std::mutex libsmtx;
-		void connectionshandler();
+		std::vector<std::tuple<std::experimental::filesystem::path, void*, void(*)(Server &, Connection &, Stream &, std::experimental::filesystem::path &, std::string &, std::string &)>> libs;
 	public:
 		Server(const std::experimental::filesystem::path &certroot, const std::experimental::filesystem::path & rootpath);
 		~Server();
+		const std::experimental::filesystem::path & GetRootPath();
+		void filehandler(Server & server, Connection & con, Stream & stream, std::experimental::filesystem::path & filepath, std::string & uri, std::string & args);
 	};
 }

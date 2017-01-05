@@ -11,20 +11,20 @@ namespace Http2
 {
 	namespace HPack
 	{
-		template<class T1, class T2>
-		bool KeySearch(const std::pair<T1, T2> &entry, const T1 & first)
-		{
-			return entry.first == first;
-		}
+		//template<class T1, class T2>
+		//bool KeySearch(const std::pair<T1, T2> &entry, const T1 & first)
+		//{
+		//	return entry.first == first;
+		//}
 
-		template<class T1, class T2>
-		bool ValueSearch(const std::pair<T1, T2> &entry, const T2 & second)
-		{
-			return entry.second == second;
-		}
+		//template<class T1, class T2>
+		//bool ValueSearch(const std::pair<T1, T2> &entry, const T2 & second)
+		//{
+		//	return entry.second == second;
+		//}
 
 		extern std::pair<uint32_t, uint8_t> StaticHuffmanTable[];
-		extern std::pair<std::string, std::string> StaticTable[];
+		__declspec(dllimport) extern std::pair<std::string, std::string> StaticTable[];
 
 		class Encoder
 		{
@@ -64,7 +64,7 @@ namespace Http2
 		inline _FwdIt Encoder::Headerblock(_FwdIt pos, const std::vector<std::pair<std::string, std::string>>& headerlist)
 		{
 			for (auto & entry : headerlist) {
-				auto res = std::search(StaticTable, StaticTable + 61, &entry, &entry + 1);
+				auto res = std::find(StaticTable, StaticTable + 61, entry);
 				if (res != (StaticTable + 61))
 				{
 					*pos = 0x80;
@@ -72,7 +72,7 @@ namespace Http2
 				}
 				else
 				{
-					auto res = std::search(dynamictable.rbegin(), dynamictable.rend(), &entry, &entry + 1);
+					auto res = std::find(dynamictable.rbegin(), dynamictable.rend(), entry);
 					if (res != dynamictable.rend())
 					{
 						*pos = 0x80;
@@ -81,20 +81,21 @@ namespace Http2
 					else
 					{
 						*pos = 0x40;
-						auto res = std::search(StaticTable, StaticTable + 61, &entry.first, &entry.first + 1, KeySearch<std::string, std::string>);
+						auto res = std::find_if(StaticTable, StaticTable + 61, FindKey<std::string, std::string>(entry.first));
 						if (res != (StaticTable + 61))
 						{
 							pos = Integer(pos, (res - StaticTable) + 1, 6);
 						}
 						else
 						{
-							auto res = std::search(dynamictable.rbegin(), dynamictable.rend(), &entry, &entry + 1);
+							auto res = std::find_if(dynamictable.rbegin(), dynamictable.rend(), FindKey<std::string, std::string>(entry.first));
 							if (res != dynamictable.rend())
 							{
 								pos = Integer(pos, (res - dynamictable.rbegin()) + 62, 6);
 							}
 							else
 							{
+								pos = Integer(pos, 0, 6);
 								pos = StringH(pos, entry.first);
 							}
 						}
