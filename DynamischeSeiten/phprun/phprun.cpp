@@ -30,7 +30,6 @@ struct PHPClientData
 {
 	Connection& con;
 	Stream& stream;
-	//std::vector<std::pair<std::string, std::string>> headerlist;
 	std::vector<std::pair<std::string, std::string>> env;
 };
 
@@ -137,7 +136,6 @@ static char* sapi_phprun_read_cookies(void)
 static void sapi_phprun_register_variables(zval *track_vars_array)
 {
 	auto &client = *(PHPClientData*)SG(server_context);
-	//php_import_environment_variables(track_vars_array);
 	for(auto &variable : client.env)
 	{
 		size_t len;
@@ -156,11 +154,6 @@ static void sapi_phprun_log_message(char *message
 {
 	std::cout << "PHP Message: '" << message << "'\n";
 }
-
-//static double php_phprun_get_request_time(void)
-//{
-//	return std::chrono::high_resolution_clock::now();
-//}
 
 static sapi_module_struct phprun_sapi_module = {
 	"phprun",						/* name */
@@ -342,20 +335,5 @@ void requesthandler(Server & server, Connection & con, Stream & stream, fs::path
 	else
 	{
 		return server.filehandler(server, con, stream, phpfile, uri2, args);
-		//std::vector<std::pair<std::string, std::string>> headerlist;
-		//headerlist.push_back({ ":status", "404" });
-		//con.winput += 3;
-		//*con.winput++ = (unsigned char)Frame::Type::HEADERS;
-		//*con.winput++ = (unsigned char)Frame::Flags::END_HEADERS | (unsigned char)Frame::Flags::END_STREAM;
-		//con.winput = std::reverse_copy((unsigned char*)&stream.indentifier, (unsigned char*)&stream.indentifier + 4, con.winput);
-		//con.winput = con.hencoder.Headerblock(con.winput, headerlist);
-		//{
-		//	uint32_t length = (con.winput - con.woutput) - 9;
-		//	std::reverse_copy((unsigned char*)&length, (unsigned char*)&length + 3, con.woutput);
-		//}
-		//do
-		//{
-		//	con.woutput += SSL_write(con.cssl, con.woutput.Pointer(), con.woutput.PointerReadableLength(con.winput));
-		//} while (con.woutput != con.winput);
 	}
 }
