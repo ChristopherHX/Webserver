@@ -15,7 +15,7 @@ namespace fs = std::experimental::filesystem;
 
 int main(int argc, const char** argv)
 {
-		/*char * buf = new char[512];
+		char * buf = new char[512];
 	#ifdef _WIN32
 		GetModuleFileNameA(NULL, buf, 512);
 	#else
@@ -23,9 +23,9 @@ int main(int argc, const char** argv)
 	#endif
 		fs::path p = buf;
 		delete[] buf;
-		p = p.parent_path().parent_path().parent_path().parent_path();*/
+		p = p.parent_path().parent_path().parent_path().parent_path();
 		try {
-			Http2::Server server("/etc/letsencrypt/live/p4fdf5699.dip0.t-ipconnect.de", "/home/ubuntu/WebServer-C++/web");///home/ubuntu/WebServer-C++/web /etc/letsencrypt/live/p4fdf5699.dip0.t-ipconnect.de/ "H:\WebServer-C++"
+			Http2::Server server(p, "C:");///home/ubuntu/WebServer-C++/web /etc/letsencrypt/live/p4fdf5699.dip0.t-ipconnect.de/ "H:\WebServer-C++"
 			std::string command;
 			std::getline(std::cin, command);
 		}

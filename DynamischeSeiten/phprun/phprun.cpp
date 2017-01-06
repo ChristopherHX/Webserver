@@ -47,7 +47,7 @@ static size_t sapi_phprun_ub_write(const char *str, size_t str_length)
 	size_t transfered = 0;
 	while (transfered < str_length)
 	{
-		uint32_t len = std::min(str_length - transfered, (size_t)16383);
+		const uint32_t &len = std::min((uint32_t)(str_length - transfered), client.con.settings[(uint16_t)Settings::MAX_FRAME_SIZE]);
 		client.con.winput = std::reverse_copy((unsigned char*)&len, (unsigned char*)&len + 3, client.con.winput);
 		*client.con.winput++ = (unsigned char)Frame::Type::DATA;
 		*client.con.winput++ = 0;
@@ -61,11 +61,14 @@ static size_t sapi_phprun_ub_write(const char *str, size_t str_length)
 			}
 			client.con.woutput += res;
 		} while (client.con.woutput != client.con.winput);
-		if ((len = SSL_write(client.con.cssl, str + transfered, len)) <= 0)
 		{
-			throw std::runtime_error("Verbindungsfehler");
+			uint32_t length;
+			if ((length = SSL_write(client.con.cssl, str + transfered, len)) <= 0)
+			{
+				throw std::runtime_error("Verbindungsfehler");
+			}
+			transfered += length;
 		}
-		transfered += len;
 	}
 	return str_length;
 }
@@ -119,9 +122,17 @@ static int sapi_phprun_send_headers(sapi_headers_struct *sapi_headers)
 static size_t sapi_phprun_read_post(char *buf, size_t count_bytes)
 {
 	auto &client = *(PHPClientData*)SG(server_context);
-	//std::cout << "POST Lesen" << count_bytes << "\n";
-	SSL_read(client.con.cssl, buf, count_bytes);
-	return 0;
+	if (Server::ReadUntil(client.con.cssl, client.con.rinput, 9))
+	{
+		Frame frame = Server::ReadFrame(client.con.routput);
+		if (frame.type == Frame::Type::DATA && frame.length <= client.con.settings[(uint16_t)Settings::MAX_FRAME_SIZE])
+		{
+			if (count_bytes < frame.length) throw std::runtime_error("PHP PostBuffer zu klein");
+			return SSL_read(client.con.cssl, buf, frame.length);
+		}
+	}
+	throw std::runtime_error("PHP Post Read Fehlgeschlagen");
+	return -1;
 }
 
 static char* sapi_phprun_read_cookies(void)
@@ -216,8 +227,6 @@ int resources = 0;
 void requesthandler(Server & server, Connection & con, Stream & stream, fs::path & filepath, std::string & uri, std::string & args)
 {
 	fs::path phpfile = server.GetRootPath() / uri;
-	//std::cout << "PHP Script" << phpfile << "\n";
-	std::string phpfilestring = phpfile.u8string();
 	std::string uri2;
 	if (Http2::FindFile(phpfile, uri2) && phpfile.extension() == ".php")
 	{
@@ -236,8 +245,9 @@ void requesthandler(Server & server, Connection & con, Stream & stream, fs::path
 		}
 #endif
 		{
-			PHPClientData info = { con , stream};
 			zend_file_handle file_handle;
+			PHPClientData info = { con , stream };
+			std::string phpfilestring = phpfile.u8string();
 			file_handle.type = ZEND_HANDLE_FILENAME;
 			file_handle.filename = (char *)phpfilestring.c_str();
 			file_handle.free_filename = 0;

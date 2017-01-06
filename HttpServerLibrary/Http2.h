@@ -131,6 +131,7 @@ namespace Http2
 		Http2::HPack::Decoder hdecoder;
 		uint32_t settings[6];
 
+		Connection();
 		Connection(uintptr_t csocket, sockaddr_in6 address);
 		Connection(Http2::Connection && con);
 		Connection(const Http2::Connection & con);
@@ -158,5 +159,8 @@ namespace Http2
 		~Server();
 		const std::experimental::filesystem::path & GetRootPath();
 		void filehandler(Server & server, Connection & con, Stream & stream, std::experimental::filesystem::path & filepath, std::string & uri, std::string & args);
+		static bool ReadUntil(SSL * ssl, Utility::RotateIterator<uint8_t> & iterator, int length);
+		static Frame ReadFrame(Utility::RotateIterator<uint8_t>& iterator);
+
 	};
 }

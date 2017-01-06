@@ -10,8 +10,14 @@ namespace Http2
 {
 	namespace HPack
 	{
+#ifdef _WIN32
+		__declspec(dllimport)
+#endif
 		extern std::pair<uint32_t, uint8_t> StaticHuffmanTable[];
-		/*__declspec(dllimport)*/ extern std::pair<std::string, std::string> StaticTable[];
+#ifdef _WIN32
+		__declspec(dllimport) 
+#endif
+		extern std::pair<std::string, std::string> StaticTable[];
 
 		class Encoder
 		{
