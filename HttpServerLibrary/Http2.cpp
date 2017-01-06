@@ -550,12 +550,13 @@ void Server::connectionshandler()
 				//	}
 				//	con.rmtx.unlock();
 				//}
-				if (con.pending > 0 || FD_ISSET(con.csocket, &active) && con.wmtx.try_lock())
+				if ((con.pending > 0 || FD_ISSET(con.csocket, &active)) && con.wmtx.try_lock())
 				{
 					FD_CLR(con.csocket, &active);
 					if (ReadUntil(con.cssl, con.rinput, 9))
 					{
 						Frame frame = ReadFrame(con.routput);
+						std::cout << "ReadFrame: " << (uint32_t)frame.type << "|" << frame.length << "\n";
 						if (frame.type <= Frame::Type::CONTINUATION && frame.length <= con.settings[(uint16_t)Settings::MAX_FRAME_SIZE] && ReadUntil(con.cssl, con.rinput, frame.length))
 						{
 							Stream & stream = GetStream(con.streams, frame.streamIndentifier);
@@ -564,7 +565,7 @@ void Server::connectionshandler()
 							{
 							case Frame::Type::DATA:
 							{
-								con.routput += frame.length;
+								//con.routput += frame.length;
 								break;
 							}
 							case Frame::Type::HEADERS:
@@ -601,6 +602,7 @@ void Server::connectionshandler()
 											filepath /= Utility::urlDecode(res->second);
 										}
 									}
+									std::cout << "res->second: " << res->second << "\n";
 									filehandler(*this, con, stream, filepath, uri, args);
 								}
 								break;
@@ -615,8 +617,8 @@ void Server::connectionshandler()
 							}
 							case Frame::Type::RST_STREAM:
 							{
-								stream.state = Stream::State::closed;
-								con.routput += frame.length;
+								//stream.state = Stream::State::closed;
+								//con.routput += frame.length;
 								break;
 							}
 							case Frame::Type::SETTINGS:
@@ -653,7 +655,7 @@ void Server::connectionshandler()
 							}
 							case Frame::Type::PUSH_PROMISE:
 							{
-								con.routput = frameend;
+								//con.routput = frameend;
 								break;
 							}
 							case Frame::Type::PING:
@@ -679,19 +681,19 @@ void Server::connectionshandler()
 							}
 							case Frame::Type::GOAWAY:
 							{
-								con.routput += frame.length;
-								con.rmtx.lock();
-								if (con.csocket != -1)
-								{
-									SSL_free(con.cssl);
-									FD_CLR(con.csocket, &sockets);
-									Http::CloseSocket(con.csocket);
-									con.cssl = 0;
-								}
-								con.wmtx.unlock();
-								con.rmtx.unlock();
-								connections.erase(conit);
-								continue;
+								//con.routput += frame.length;
+								//con.rmtx.lock();
+								//if (con.csocket != -1)
+								//{
+								//	SSL_free(con.cssl);
+								//	FD_CLR(con.csocket, &sockets);
+								//	Http::CloseSocket(con.csocket);
+								//	con.cssl = 0;
+								//}
+								//con.wmtx.unlock();
+								//con.rmtx.unlock();
+								//connections.erase(conit);
+								//continue;
 								break;
 							}
 							case Frame::Type::WINDOW_UPDATE:
@@ -702,12 +704,12 @@ void Server::connectionshandler()
 							}
 							case Frame::Type::CONTINUATION:
 							{
-								con.routput += frame.length;
+								//con.routput += frame.length;
 								break;
 							}
 							default:
 							{
-								con.routput += frame.length;
+								//con.routput += frame.length;
 							}
 							}
 							if (con.routput != frameend)
