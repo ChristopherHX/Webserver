@@ -24,22 +24,27 @@
 #define closesocket(socket) close(socket)
 #endif
 
+/*template<class T1, class T2>
+class FindKey
+{
+private:
+        const T1 &key;
+public:
+        FindKey(const T1& key) : key(key) {}
+        bool operator()(const std::pair<T1, T2> &pair)
+        {
+                return pair.first == key;
+        }
+};*/
+
 namespace Http2
 {
-	extern std::pair<std::experimental::filesystem::path, std::string> MimeTypeTable[];
-
-	template<class T1, class T2>
-	class FindKey
+	namespace HPack
 	{
-	private:
-		const T1 &key;
-	public:
-		FindKey(const T1& key) : key(key) {}
-		bool operator()(const std::pair<T1, T2> &pair)
-		{
-			return pair.first == key;
-		}
-	};
+		class Encoder;
+		class Decoder;
+	}
+	extern std::pair<std::experimental::filesystem::path, std::string> MimeTypeTable[];
 
 	struct Frame
 	{
@@ -122,8 +127,8 @@ namespace Http2
 		Utility::RotateIterator<uint8_t> rinput, routput;
 		Utility::RotateIterator<uint8_t> winput, woutput;
 		std::vector<Stream> streams;
-		HPack::Encoder hencoder;
-		HPack::Decoder hdecoder;
+		Http2::HPack::Encoder hencoder;
+		Http2::HPack::Decoder hdecoder;
 		uint32_t settings[6];
 
 		Connection(uintptr_t csocket, sockaddr_in6 address);

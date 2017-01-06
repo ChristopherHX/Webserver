@@ -21,7 +21,7 @@
 #else
 #define dlopen(name) dlopen(name,RTLD_NOW);
 #define initsymbol "_Z4initv"
-#define mainsymbol "_Z14requesthandlerRN5Http210ConnectionERNS_6StreamERKNSt12experimental10filesystem2v17__cxx114pathERKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEESI_"
+#define mainsymbol "_Z14requesthandlerRN5Http26ServerERNS_10ConnectionERNS_6StreamERNSt12experimental10filesystem2v17__cxx114pathERNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEESI_"
 #define deinitsymbol "_Z6deinitv"
 #endif
 
@@ -203,7 +203,7 @@ void Http2::Server::filehandler(Server & server, Connection & con, Stream & stre
 	if (FindFile(filepath, uri))
 	{
 		fs::path ext = filepath.extension();
-		if (ext == ".dll")
+		if (ext == ".so")
 		{
 			auto res = std::find_if(libs.begin(), libs.end(), [&filepath](const std::tuple<std::experimental::filesystem::path, void*, void(*)(Server &, Connection &, Stream &, std::experimental::filesystem::path &, std::string &, std::string &)> & left) {
 				return std::get<0>(left) == filepath;
@@ -235,7 +235,7 @@ void Http2::Server::filehandler(Server & server, Connection & con, Stream & stre
 		}
 		else
 		{
-			auto res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), FindKey<std::string, std::string>(":method"));
+			auto res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair){ return pair.first == ":method";});
 			if (res != stream.headerlist.end() && (res->second == Http::Get || res->second == Http::Head))
 			{
 				{
@@ -243,7 +243,7 @@ void Http2::Server::filehandler(Server & server, Connection & con, Stream & stre
 					std::vector<char> buf(128);
 					time_t date = fs::file_time_type::clock::to_time_t(fs::last_write_time(filepath));
 					strftime(buf.data(), buf.size(), "%a, %d %b %Y %H:%M:%S GMT", std::gmtime(&date));
-					res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), FindKey<std::string, std::string>("if-modified-since"));
+					res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair){ return pair.first == "if-modified-since";});
 					if (res != stream.headerlist.end() && res->second == buf.data())
 					{
 						headerlist.push_back({ ":status", "304" });
@@ -270,7 +270,7 @@ void Http2::Server::filehandler(Server & server, Connection & con, Stream & stre
 					headerlist.push_back({ "accept-ranges", "bytes" });
 				}
 				uintmax_t offset = 0, length = fs::file_size(filepath);
-				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), FindKey<std::string, std::string>("range"));
+				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair){ return pair.first == "range";});
 				if (res != stream.headerlist.end())
 				{
 					uintmax_t lpos = length - 1;
@@ -304,7 +304,7 @@ void Http2::Server::filehandler(Server & server, Connection & con, Stream & stre
 				}
 				headerlist.push_back({ "content-length", std::to_string(length) });
 				{
-					headerlist.push_back({ "content-type", std::find_if(MimeTypeTable, MimeTypeTable + (sizeof(MimeTypeTable) / sizeof(std::pair<fs::path, std::string>) - 1), FindKey<fs::path, std::string>(ext))->second });
+					headerlist.push_back({ "content-type", std::find_if(MimeTypeTable, MimeTypeTable + (sizeof(MimeTypeTable) / sizeof(std::pair<fs::path, std::string>) - 1), [&ext](const std::pair<std::string, std::string> & pair){ return pair.first == ext;})->second });
 				}
 				if (args == "herunterladen")
 				{
@@ -600,7 +600,7 @@ void Server::connectionshandler()
 							continue;
 						}
 						con.routput = con.hdecoder.Headerblock(con.routput, con.routput + hl, stream.headerlist);
-						auto res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), FindKey<std::string, std::string>(":path"));
+						auto res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair){ return pair.first == ":path";});
 						if (res != stream.headerlist.end())
 						{
 							fs::path filepath = rootpath;
@@ -759,7 +759,10 @@ Http2::Connection::Connection(uintptr_t csocket, sockaddr_in6 address)
 	this->wbuf.resize(1024);
 	this->wranges = { this->wbuf.data(), this->wbuf.data() + this->wbuf.size(), this->wbuf.size() };
 	this->pending = 0;
-	memcpy(this->settings, std::initializer_list<uint32_t>{4096, 1, std::numeric_limits<uint32_t>::max(), 65535, 16384, std::numeric_limits<uint32_t>::max() }.begin(), sizeof(settings));
+	{
+		std::initializer_list<uint32_t> settings{4096, 1, std::numeric_limits<uint32_t>::max(), 65535, 16384, std::numeric_limits<uint32_t>::max() };
+		memcpy(this->settings, settings.begin(), sizeof(settings));
+	}
 }
 
 Http2::Connection::Connection(Http2::Connection&& con)

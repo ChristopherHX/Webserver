@@ -6,25 +6,12 @@
 #include <string>
 #include <sstream>
 
-
 namespace Http2
 {
 	namespace HPack
 	{
-		//template<class T1, class T2>
-		//bool KeySearch(const std::pair<T1, T2> &entry, const T1 & first)
-		//{
-		//	return entry.first == first;
-		//}
-
-		//template<class T1, class T2>
-		//bool ValueSearch(const std::pair<T1, T2> &entry, const T2 & second)
-		//{
-		//	return entry.second == second;
-		//}
-
 		extern std::pair<uint32_t, uint8_t> StaticHuffmanTable[];
-		__declspec(dllimport) extern std::pair<std::string, std::string> StaticTable[];
+		/*__declspec(dllimport)*/ extern std::pair<std::string, std::string> StaticTable[];
 
 		class Encoder
 		{
@@ -81,14 +68,14 @@ namespace Http2
 					else
 					{
 						*pos = 0x40;
-						auto res = std::find_if(StaticTable, StaticTable + 61, FindKey<std::string, std::string>(entry.first));
+						auto res = std::find_if(StaticTable, StaticTable + 61, [&key = entry.first](const std::pair<std::string, std::string> & pair){ return pair.first == key; });
 						if (res != (StaticTable + 61))
 						{
 							pos = Integer(pos, (res - StaticTable) + 1, 6);
 						}
 						else
 						{
-							auto res = std::find_if(dynamictable.rbegin(), dynamictable.rend(), FindKey<std::string, std::string>(entry.first));
+							auto res = std::find_if(dynamictable.rbegin(), dynamictable.rend(), [&key = entry.first](const std::pair<std::string, std::string> & pair){ return pair.first == key; });
 							if (res != dynamictable.rend())
 							{
 								pos = Integer(pos, (res - dynamictable.rbegin()) + 62, 6);

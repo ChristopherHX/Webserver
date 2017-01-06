@@ -2,7 +2,6 @@
 #include "Array.h"
 #include "HttpRequestBuffer.h"
 #include "Http.h"
-#include "Http2.h"
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
