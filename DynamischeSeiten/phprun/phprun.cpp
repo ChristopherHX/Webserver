@@ -118,7 +118,9 @@ static int sapi_phprun_send_headers(sapi_headers_struct *sapi_headers)
 
 static size_t sapi_phprun_read_post(char *buf, size_t count_bytes)
 {
-	std::cout << "POST Lesen" << count_bytes << "\n";
+	auto &client = *(PHPClientData*)SG(server_context);
+	//std::cout << "POST Lesen" << count_bytes << "\n";
+	SSL_read(client.con.cssl, buf, count_bytes);
 	return 0;
 }
 
@@ -275,14 +277,14 @@ void requesthandler(Server & server, Connection & con, Stream & stream, fs::path
 				}
 				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair){ return pair.first == "content-length";});
 				if (res != stream.headerlist.end())
-                                {
-                                        SG(request_info).content_length = (int64_t)std::stoll(res->second);
-                                }
-                                res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair){ return pair.first == "content-type";});
-                                if (res != stream.headerlist.end())
-                                {
-                                        SG(request_info).content_type = res->second.c_str();
-                                }
+				{
+					SG(request_info).content_length = (int64_t)std::stoll(res->second);
+				}
+				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair){ return pair.first == "content-type";});
+				if (res != stream.headerlist.end())
+				{
+					SG(request_info).content_type = res->second.c_str();
+				}
 				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair){ return pair.first == "accept";});
 				if (res != stream.headerlist.end())
 				{
@@ -322,7 +324,6 @@ void requesthandler(Server & server, Connection & con, Stream & stream, fs::path
 #ifndef ZTS
 			phpsync.lock();
 #endif
-			//TSRMG_BULK(sapi_globals_id, sapi_globals_struct*)->request_info;
 			SG(server_context) = &info;
 			php_request_startup();
 			php_execute_script(&file_handle);
