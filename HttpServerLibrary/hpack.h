@@ -142,6 +142,10 @@ namespace Http2
 				{
 					uint64_t index;
 					pos = Integer(pos, index, 7);
+					if (index > (62 + dynamictable.size()) || index == 0)
+					{
+						throw std::runtime_error("Compressionsfehler invalid index");
+					}
 					auto & el = index < 62 ? StaticTable[index - 1] : *(dynamictable.rbegin() + (index - 62));
 					headerlist.push_back(el);
 				}
@@ -156,16 +160,29 @@ namespace Http2
 					}
 					else
 					{
+						if (index > (62 + dynamictable.size()) || index == 0)
+						{
+							throw std::runtime_error("Compressionsfehler invalid index");
+						}
 						key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictable.rbegin() + (index - 62))).first;
 					}
+					if (key == "")
+					{
+						throw std::runtime_error("Compressionsfehler");
+					}
 					pos = String(pos, value);
+					if (value == "")
+					{
+						throw std::runtime_error("Compressionsfehler");
+					}
 					headerlist.push_back({ key, value });
 					dynamictable.push_back({ key, value });
 				}
 				else if ((*pos & 0x20) != 0)
 				{
 					uint64_t maxsize;
-					Integer(pos, maxsize, 5);
+					pos = Integer(pos, maxsize, 5);
+					std::cout << "Compressions maxsize=" << maxsize << "\n";
 				}
 				else if ((*pos & 0x10) != 0)
 				{
@@ -178,9 +195,21 @@ namespace Http2
 					}
 					else
 					{
+						if (index > (62 + dynamictable.size()) || index == 0)
+						{
+							throw std::runtime_error("Compressionsfehler invalid index");
+						}
 						key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictable.rbegin() + (index - 62))).first;
 					}
+					if (key == "")
+					{
+						throw std::runtime_error("Compressionsfehler");
+					}
 					pos = String(pos, value);
+					if (value == "")
+					{
+						throw std::runtime_error("Compressionsfehler");
+					}
 					headerlist.push_back({ key, value });
 				}
 				else
@@ -194,10 +223,27 @@ namespace Http2
 					}
 					else
 					{
+						if (index > (62 + dynamictable.size()) || index == 0)
+						{
+							throw std::runtime_error("Compressionsfehler invalid index");
+						}
 						key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictable.rbegin() + (index - 62))).first;
 					}
+					if (key == "")
+					{
+						throw std::runtime_error("Compressionsfehler");
+					}
 					pos = String(pos, value);
+					if (value == "")
+					{
+						throw std::runtime_error("Compressionsfehler");
+					}
 					headerlist.push_back({ key, value });
+				}
+				if (pos > end)
+				{
+					throw std::runtime_error("Compressionsfehler");
+					return end;
 				}
 			}
 			return pos;
@@ -205,8 +251,8 @@ namespace Http2
 		template<class _FwdIt>
 		inline _FwdIt Decoder::Integer(_FwdIt pos, uint64_t & integer, uint8_t bits)
 		{
-			integer = *pos & ((1 << bits) - 1);
-			if (integer == ((1 << bits) - 1))
+			uint8_t mask = (1 << bits) - 1;
+			if ((integer = *pos & mask) == mask)
 			{
 				uint64_t pbits = 0;
 				do
@@ -224,11 +270,10 @@ namespace Http2
 			long long  i = 0, blength = length << 3;
 			while (true)
 			{
-				uint32_t buf = ((pos[i >> 3] << 24) | (pos[(i >> 3) + 1] << 16) | (pos[(i >> 3) + 2] << 8) | pos[(i >> 3) + 3]) << (i % 8);
-				std::pair<uint32_t, uint8_t> *res = std::search(StaticHuffmanTable, StaticHuffmanTable + 256, &buf, &buf + 1, [](const std::pair<uint32_t, uint8_t> & entry, uint32_t buffer) -> bool {
-					return (entry.first << (32 - entry.second)) == (buffer & (~(((uint32_t)1 << (32 - entry.second)) - 1)));
+				std::pair<uint32_t, uint8_t> *res = std::find_if(StaticHuffmanTable, StaticHuffmanTable + 256, [buffer = (uint32_t)(((pos[i >> 3] << 24) | (pos[(i >> 3) + 1] << 16) | (pos[(i >> 3) + 2] << 8) | pos[(i >> 3) + 3]) << (i % 8)), maxbits = blength - i](const std::pair<uint32_t, uint8_t> & entry) -> bool {
+					return (maxbits >= entry.second) && (entry.first == (buffer >> (32 - entry.second)));
 				});
-				if ((i += res->second) > blength | res >= (StaticHuffmanTable + 256))
+				if ((i += res->second) > blength | res >= (StaticHuffmanTable + 255))
 				{
 					string = strs.str();
 					return pos + length;

@@ -12,6 +12,7 @@
 #include <ws2tcpip.h>
 #undef min
 #undef max
+#undef NO_ERROR
 #define SHUT_RDWR SD_BOTH
 #else
 #include <arpa/inet.h>
@@ -75,6 +76,26 @@ namespace Http2
 		uint32_t streamIndentifier;
 	};
 
+	enum class ErrorCode : uint32_t
+	{
+		NO_ERROR,
+		PROTOCOL_ERROR,
+		INTERNAL_ERROR,
+		FLOW_CONTROL_ERROR,
+		SETTINGS_TIMEOUT,
+		STREAM_CLOSED,
+		FRAME_SIZE_ERROR,
+		REFUSED_STREAM,
+		CANCEL,
+		COMPRESSION_ERROR,
+		CONNECT_ERROR,
+		ENHANCE_YOUR_CALM,
+		INADEQUATE_SECURITY,
+		HTTP_1_1_REQUIRED
+	};
+
+	extern std::string ErrorCodes[];
+
 	enum class Settings : uint16_t
 	{
 		HEADER_TABLE_SIZE = 0x0,
@@ -88,15 +109,15 @@ namespace Http2
 	class Stream
 	{
 	public:
-		enum class State
+		enum class State : uint8_t
 		{
-			idle,
-			reserved_local,
-			reserved_remote,
-			open,
-			half_closed_local,
-			half_closed_remote,
-			closed
+			idle = 0b0,
+			reserved_local = 0b00000100,
+			reserved_remote = 0b00001000,
+			open = 0b00000011,
+			half_closed_local = 0b00000001,
+			half_closed_remote = 0b00000010,
+			closed = 0b11110000
 		};
 		class Priority
 		{
