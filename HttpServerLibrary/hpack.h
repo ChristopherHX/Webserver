@@ -268,15 +268,22 @@ namespace Http2
 		{
 			std::ostringstream strs;
 			long long  i = 0, blength = length << 3;
+			uint64_t buffer;
+			auto end = pos + length;
 			while (true)
 			{
-				std::pair<uint32_t, uint8_t> *res = std::find_if(StaticHuffmanTable, StaticHuffmanTable + 256, [buffer = (uint32_t)(((pos[i >> 3] << 24) | (pos[(i >> 3) + 1] << 16) | (pos[(i >> 3) + 2] << 8) | pos[(i >> 3) + 3]) << (i % 8)), maxbits = blength - i](const std::pair<uint32_t, uint8_t> & entry) -> bool {
-					return (maxbits >= entry.second) && (entry.first == (buffer >> (32 - entry.second)));
+				{
+					uint8_t count = std::min<uint8_t>(5, (end - pos));
+					std::reverse_copy(pos, pos + count, ((uint8_t*)&buffer) + (5 - count));
+				}
+				std::pair<uint32_t, uint8_t> *res = std::find_if(StaticHuffmanTable, StaticHuffmanTable + 256, [buffer = (uint32_t)(buffer >> (8 - (i % 8)))](const std::pair<uint32_t, uint8_t> & entry) -> bool {
+					return entry.first == (buffer >> (32 - entry.second));
 				});
+				pos += (i % 8 + res->second) >> 3;
 				if ((i += res->second) > blength | res >= (StaticHuffmanTable + 255))
 				{
 					string = strs.str();
-					return pos + length;
+					return end;
 				}
 				strs << (char)(res - StaticHuffmanTable);
 			}

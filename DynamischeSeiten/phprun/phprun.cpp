@@ -45,30 +45,25 @@ static size_t sapi_phprun_ub_write(const char *str, size_t str_length)
 	}
 	auto &client = *(PHPClientData*)SG(server_context);
 	size_t transfered = 0;
+	std::vector<uint8_t> buffer(9);
+	auto wpos = buffer.begin();
+	wpos += 3;
+	*wpos++ = (unsigned char)Frame::Type::DATA;
+	*wpos++ = 0;
+	wpos = std::reverse_copy((unsigned char*)&client.stream.indentifier, (unsigned char*)&client.stream.indentifier + 4, wpos);
 	while (transfered < str_length)
 	{
 		const uint32_t &len = std::min((uint32_t)(str_length - transfered), client.con.settings[(uint16_t)Settings::MAX_FRAME_SIZE]);
-		client.con.winput = std::reverse_copy((unsigned char*)&len, (unsigned char*)&len + 3, client.con.winput);
-		*client.con.winput++ = (unsigned char)Frame::Type::DATA;
-		*client.con.winput++ = 0;
-		client.con.winput = std::reverse_copy((unsigned char*)&client.stream.indentifier, (unsigned char*)&client.stream.indentifier + 4, client.con.winput);
-		do
+		std::reverse_copy((unsigned char*)&len, (unsigned char*)&len + 3, buffer.begin());
+		if (SSL_write(client.con.cssl, buffer.data(), buffer.size()) <= 0)
 		{
-			int res = SSL_write(client.con.cssl, client.con.woutput.Pointer(), client.con.woutput.PointerReadableLength(client.con.winput));
-			if (res <= 0)
-			{
-				throw std::runtime_error("Verbindungsfehler");
-			}
-			client.con.woutput += res;
-		} while (client.con.woutput != client.con.winput);
-		{
-			uint32_t length;
-			if ((length = SSL_write(client.con.cssl, str + transfered, len)) <= 0)
-			{
-				throw std::runtime_error("Verbindungsfehler");
-			}
-			transfered += length;
+			throw std::runtime_error("Verbindungsfehler");
 		}
+		if (SSL_write(client.con.cssl, str + transfered, len) <= 0)
+		{
+			throw std::runtime_error("Verbindungsfehler");
+		}
+		transfered += len;
 	}
 	return str_length;
 }
@@ -98,33 +93,31 @@ static int sapi_phprun_send_headers(sapi_headers_struct *sapi_headers)
 			}
 		}
 	}
-	client.con.winput += 3;
-	*client.con.winput++ = (unsigned char)Frame::Type::HEADERS;
-	*client.con.winput++ = (unsigned char)Frame::Flags::END_HEADERS;
-	client.con.winput = std::reverse_copy((unsigned char*)&client.stream.indentifier, (unsigned char*)&client.stream.indentifier + 4, client.con.winput);
-	client.con.winput = client.con.hencoder.Headerblock(client.con.winput, headerlist);
+	std::vector<uint8_t> buffer(9 + client.con.settings[(uint32_t)Settings::MAX_HEADER_LIST_SIZE]);
+	auto wpos = buffer.begin();
+	wpos += 3;
+	*wpos++ = (unsigned char)Frame::Type::HEADERS;
+	*wpos++ = (unsigned char)Frame::Flags::END_HEADERS;
+	wpos = std::reverse_copy((unsigned char*)&client.stream.indentifier, (unsigned char*)&client.stream.indentifier + 4, wpos);
+	wpos = client.con.hencoder.Headerblock(wpos, headerlist);
 	{
-		uint32_t length = (client.con.winput - client.con.woutput) - 9;
-		std::reverse_copy((unsigned char*)&length, (unsigned char*)&length + 3, client.con.woutput);
+		uint32_t length = (wpos - buffer.begin()) - 9;
+		std::reverse_copy((unsigned char*)&length, (unsigned char*)&length + 3, buffer.begin());
 	}
-	do
+	if (SSL_write(client.con.cssl, buffer.data(), buffer.size()) <= 0)
 	{
-		int res = SSL_write(client.con.cssl, client.con.woutput.Pointer(), client.con.woutput.PointerReadableLength(client.con.winput));
-		if (res <= 0)
-		{
-			throw std::runtime_error("Verbindungsfehler");
-		}
-		client.con.woutput += res;
-	} while (client.con.woutput != client.con.winput);
+		throw std::runtime_error("Verbindungsfehler");
+	}
 	return SAPI_HEADER_SENT_SUCCESSFULLY;
 }
 
 static size_t sapi_phprun_read_post(char *buf, size_t count_bytes)
 {
 	auto &client = *(PHPClientData*)SG(server_context);
-	if (Server::ReadUntil(client.con.cssl, client.con.rinput, 9))
+	std::vector<uint8_t> buffer(9);
+	if (ReadUntil(client.con.cssl, buffer.data(), 9))
 	{
-		Frame frame = Server::ReadFrame(client.con.routput);
+		Frame frame = ReadFrame(buffer.begin());
 		if (frame.type == Frame::Type::DATA && frame.length <= client.con.settings[(uint16_t)Settings::MAX_FRAME_SIZE])
 		{
 			if (count_bytes < frame.length) throw std::runtime_error("PHP PostBuffer zu klein");
@@ -344,16 +337,20 @@ void requesthandler(Server & server, Connection & con, Stream & stream, fs::path
 #endif
 		}
 		{
-			long long count = 0;
-			con.winput = std::reverse_copy((unsigned char*)&count, (unsigned char*)&count + 3, con.winput);
+			std::vector<uint8_t> buffer(9);
+			auto wpos = buffer.begin();
+			{
+				long long count = 0;
+				wpos = std::reverse_copy((unsigned char*)&count, (unsigned char*)&count + 3, wpos);
+			}
+			*wpos++ = (unsigned char)Frame::Type::DATA;
+			*wpos++ = (unsigned char)Frame::Flags::END_STREAM;
+			wpos = std::reverse_copy((unsigned char*)&stream.indentifier, (unsigned char*)&stream.indentifier + 4, wpos);
+			if (SSL_write(con.cssl, buffer.data(), buffer.size()) <= 0)
+			{
+				throw std::runtime_error("Verbindungsfehler");
+			}
 		}
-		*con.winput++ = (unsigned char)Frame::Type::DATA;
-		*con.winput++ = (unsigned char)Frame::Flags::END_STREAM;
-		con.winput = std::reverse_copy((unsigned char*)&stream.indentifier, (unsigned char*)&stream.indentifier + 4, con.winput);
-		do
-		{
-			con.woutput += SSL_write(con.cssl, con.woutput.Pointer(), con.woutput.PointerReadableLength(con.winput));
-		} while (con.woutput != con.winput);
 	}
 	else
 	{

@@ -142,18 +142,13 @@ namespace Http2
 		uintptr_t csocket;
 		sockaddr_in6 address;
 		SSL * cssl;
-		int pending;
-		std::vector<uint8_t> rbuf, wbuf;
-		Utility::Ranges<uint8_t> rranges, wranges;
-		Utility::RotateIterator<uint8_t> rinput, routput;
-		Utility::RotateIterator<uint8_t> winput, woutput;
 		std::vector<Stream> streams;
 		Http2::HPack::Encoder hencoder;
 		Http2::HPack::Decoder hdecoder;
 		uint32_t settings[6];
 
 		Connection();
-		Connection(uintptr_t csocket, sockaddr_in6 address);
+		Connection(uintptr_t csocket, const sockaddr_in6 &address);
 		Connection(Http2::Connection && con);
 		Connection(const Http2::Connection & con);
 		~Connection();
@@ -161,6 +156,20 @@ namespace Http2
 	};
 
 	bool FindFile(std::experimental::filesystem::path & filepath, std::string & uri);
+	bool ReadUntil(SSL *ssl, uint8_t * buffer, int length);
+	template<class Iterator>
+	Frame ReadFrame(Iterator iterator)
+	{
+		Frame frame;
+		*std::reverse_copy(iterator, iterator + 3, (unsigned char*)&frame.length) = 0;
+		iterator += 3;
+		frame.type = (Frame::Type)*iterator++;
+		frame.flags = (Frame::Flags)*iterator++;
+		std::reverse_copy(iterator, iterator + 4, (unsigned char*)&frame.streamIndentifier);
+		iterator += 4;
+		return frame;
+	}
+
 
 	class Server
 	{
@@ -180,8 +189,5 @@ namespace Http2
 		~Server();
 		const std::experimental::filesystem::path & GetRootPath();
 		void filehandler(Server & server, Connection & con, Stream & stream, std::experimental::filesystem::path & filepath, std::string & uri, std::string & args);
-		static bool ReadUntil(SSL * ssl, Utility::RotateIterator<uint8_t> & iterator, int length);
-		static Frame ReadFrame(Utility::RotateIterator<uint8_t>& iterator);
-
 	};
 }
