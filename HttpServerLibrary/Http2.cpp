@@ -224,6 +224,7 @@ bool Http2::ReadUntil(SSL *ssl, uint8_t * buffer, int length)
 
 Stream & GetStream(std::vector<Stream> &streams, uint32_t streamIndentifier)
 {
+	std::cout << "Get Stream: " << streamIndentifier << "\n";
 	while (true)
 	{
 		auto res = std::find_if(streams.begin(), streams.end(), [streamIndentifier](const Stream &stream) -> bool { return stream.indentifier == streamIndentifier; });
@@ -233,6 +234,7 @@ Stream & GetStream(std::vector<Stream> &streams, uint32_t streamIndentifier)
 		}
 		else
 		{
+			std::cout << "Got Stream: " << res->indentifier << "\n";
 			return *res;
 		}
 	}
@@ -286,6 +288,7 @@ void Http2::Server::filehandler(Server & server, Connection & con, Stream & stre
 					res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "if-modified-since"; });
 					if (res != stream.headerlist.end() && res->second == buf.data())
 					{
+						headerlist.clear();
 						headerlist.push_back({ ":status", "304" });
 						std::vector<uint8_t> buffer(9 + 10);
 						auto wpos = buffer.begin();
@@ -293,6 +296,7 @@ void Http2::Server::filehandler(Server & server, Connection & con, Stream & stre
 						*wpos++ = (unsigned char)Frame::Type::HEADERS;
 						*wpos++ = (unsigned char)Frame::Flags::END_HEADERS | (unsigned char)Frame::Flags::END_STREAM;
 						wpos = std::reverse_copy((unsigned char*)&stream.indentifier, (unsigned char*)&stream.indentifier + 4, wpos);
+						wpos = con.hencoder.Headerblock(wpos, headerlist);
 						{
 							uint32_t length = wpos - buffer.begin() - 9;
 							std::reverse_copy((unsigned char*)&length, (unsigned char*)&length + 3, buffer.begin());
