@@ -327,7 +327,7 @@ void Http2::Server::filehandler(Server & server, Connection & con, Stream & stre
 						else
 						{
 							*headerlist.begin() = { ":status", "416" };
-							std::vector<uint8_t> buffer(9 + con.settings[(uint32_t)Settings::MAX_HEADER_LIST_SIZE]);
+							std::vector<uint8_t> buffer(9 + con.settings[(uint32_t)Settings::MAX_FRAME_SIZE]);
 							auto wpos = buffer.begin();
 							wpos += 3;
 							*wpos++ = (unsigned char)Frame::Type::HEADERS;
@@ -355,7 +355,7 @@ void Http2::Server::filehandler(Server & server, Connection & con, Stream & stre
 					{
 						std::ifstream fstream = std::ifstream(filepath, std::ios::binary);
 						if (!fstream.is_open()) throw std::runtime_error(u8"Datei kann nicht ge�ffnet werden");
-						std::vector<uint8_t> buffer(9 + con.settings[(uint32_t)Settings::MAX_HEADER_LIST_SIZE]);
+						std::vector<uint8_t> buffer(9 + con.settings[(uint32_t)Settings::MAX_FRAME_SIZE]);
 						auto wpos = buffer.begin();
 						wpos += 3;
 						*wpos++ = (unsigned char)Frame::Type::HEADERS;
@@ -498,7 +498,7 @@ void Server::connectionshandler()
 						{
 							Frame frame = ReadFrame(framebuf.begin());
 							std::cout << "Read Frame: " << (uint32_t)frame.type << " | " << frame.length << "\n";
-							if (frame.type > Frame::Type::CONTINUATION || frame.length > con.settings[(uint16_t)Settings::MAX_FRAME_SIZE])
+							if (((uint8_t)frame.type > (uint8_t)Frame::Type::CONTINUATION) || (frame.length > con.settings[(uint16_t)Settings::MAX_FRAME_SIZE]))
 							{
 								con.rmtx.unlock();
 								throw std::runtime_error("Fehler: Invalid Frame");

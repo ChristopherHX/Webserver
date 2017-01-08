@@ -93,7 +93,7 @@ static int sapi_phprun_send_headers(sapi_headers_struct *sapi_headers)
 			}
 		}
 	}
-	std::vector<uint8_t> buffer(9 + client.con.settings[(uint32_t)Settings::MAX_HEADER_LIST_SIZE]);
+	std::vector<uint8_t> buffer(9 + client.con.settings[(uint32_t)Settings::MAX_FRAME_SIZE]);
 	auto wpos = buffer.begin();
 	wpos += 3;
 	*wpos++ = (unsigned char)Frame::Type::HEADERS;
