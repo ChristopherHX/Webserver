@@ -500,6 +500,8 @@ void Server::connectionshandler()
 							std::cout << "Read Frame: " << (uint32_t)frame.type << " | " << frame.length << "\n";
 							if (((uint8_t)frame.type > (uint8_t)Frame::Type::CONTINUATION) || (frame.length > con.settings[(uint16_t)Settings::MAX_FRAME_SIZE]))
 							{
+								std::cout << "MAX_FRAME_SIZE=" << con.settings[(uint16_t)Settings::MAX_FRAME_SIZE] << "\n";
+								std::cout << "CONTINUATION=" << (uint8_t)Frame::Type::CONTINUATION << "\n";
 								con.rmtx.unlock();
 								throw std::runtime_error("Fehler: Invalid Frame");
 							}
@@ -721,8 +723,8 @@ Http2::Stream::Priority::Priority()
 
 Http2::Connection::Connection()
 {
-	std::initializer_list<uint32_t> settings{ 4096, 1, std::numeric_limits<uint32_t>::max(), 65535, 16384, std::numeric_limits<uint32_t>::max() };
-	memcpy(this->settings, settings.begin(), sizeof(settings));
+	uint32_t ssettings[] = { 4096, 1, std::numeric_limits<uint32_t>::max(), 65535, 16384, std::numeric_limits<uint32_t>::max() };
+	memcpy(this->settings, ssettings, sizeof(settings));
 }
 
 Http2::Connection::Connection(uintptr_t csocket, const sockaddr_in6 &address) : Connection()
