@@ -53,7 +53,7 @@ static size_t sapi_phprun_ub_write(const char *str, size_t str_length)
 	wpos = std::reverse_copy((unsigned char*)&client.stream.indentifier, (unsigned char*)&client.stream.indentifier + 4, wpos);
 	while (transfered < str_length)
 	{
-		const uint32_t &len = std::min((uint32_t)(str_length - transfered), client.con.settings[(uint16_t)Settings::MAX_FRAME_SIZE]);
+		const uint32_t len = std::min((uint32_t)(str_length - transfered), client.con.settings[(uint16_t)Settings::MAX_FRAME_SIZE]);
 		std::reverse_copy((unsigned char*)&len, (unsigned char*)&len + 3, buffer.begin());
 		if (SSL_write(client.con.cssl, buffer.data(), buffer.size()) <= 0)
 		{
@@ -115,18 +115,31 @@ static int sapi_phprun_send_headers(sapi_headers_struct *sapi_headers)
 static size_t sapi_phprun_read_post(char *buf, size_t count_bytes)
 {
 	auto &client = *(PHPClientData*)SG(server_context);
-	std::vector<uint8_t> buffer(9);
-	if (ReadUntil(client.con.cssl, buffer.data(), 9))
+	switch (client.stream.state)
 	{
-		Frame frame = ReadFrame(buffer.begin());
-		if (frame.type == Frame::Type::DATA && frame.length <= client.con.settings[(uint16_t)Settings::MAX_FRAME_SIZE])
+		case Stream::State::open:
+		case Stream::State::half_closed_local:
 		{
-			if (count_bytes < frame.length) throw std::runtime_error("PHP PostBuffer zu klein");
-			return SSL_read(client.con.cssl, buf, frame.length);
+			std::vector<uint8_t> buffer(9);
+			if (ReadUntil(client.con.cssl, buffer.data(), 9))
+			{
+				Frame frame = ReadFrame(buffer.begin());
+				if ((uint8_t)frame.flags & (uint8_t)Frame::Flags::END_STREAM)
+				{
+					client.stream.state = client.stream.state == Stream::State::open ? Stream::State::half_closed_remote : Stream::State::closed;
+				}
+				if (frame.type == Frame::Type::DATA && frame.length <= client.con.settings[(uint16_t)Settings::MAX_FRAME_SIZE])
+				{
+					if (count_bytes < frame.length) throw std::runtime_error("PHP PostBuffer zu klein");
+					return SSL_read(client.con.cssl, buf, frame.length);
+				}
+			}
+			throw std::runtime_error("PHP Post Read Fehlgeschlagen");
+			return -1;
 		}
+		default:
+			return 0;
 	}
-	throw std::runtime_error("PHP Post Read Fehlgeschlagen");
-	return -1;
 }
 
 static char* sapi_phprun_read_cookies(void)
@@ -280,10 +293,7 @@ void requesthandler(Server & server, Connection & con, Stream & stream, fs::path
 					info.env.push_back({ "REQUEST_METHOD", res->second });
 				}
 				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "content-length"; });
-				if (res != stream.headerlist.end())
-				{
-					SG(request_info).content_length = (int64_t)std::stoll(res->second);
-				}
+				SG(request_info).content_length = res != stream.headerlist.end() ? (int64_t)std::stoll(res->second) : 0;
 				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "content-type"; });
 				if (res != stream.headerlist.end())
 				{
