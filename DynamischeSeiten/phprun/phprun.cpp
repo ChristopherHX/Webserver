@@ -124,14 +124,16 @@ static size_t sapi_phprun_read_post(char *buf, size_t count_bytes)
 			if (ReadUntil(client.con.cssl, buffer.data(), 9))
 			{
 				Frame frame = ReadFrame(buffer.begin());
-				if ((uint8_t)frame.flags & (uint8_t)Frame::Flags::END_STREAM)
-				{
-					client.stream.state = client.stream.state == Stream::State::open ? Stream::State::half_closed_remote : Stream::State::closed;
-				}
 				if (frame.type == Frame::Type::DATA && frame.length <= client.con.settings[(uint16_t)Settings::MAX_FRAME_SIZE])
 				{
 					if (count_bytes < frame.length) throw std::runtime_error("PHP PostBuffer zu klein");
-					return SSL_read(client.con.cssl, buf, frame.length);
+					size_t count = SSL_read(client.con.cssl, buf, frame.length);
+					if ((uint8_t)frame.flags & (uint8_t)Frame::Flags::END_STREAM)
+					{
+						client.stream.state = client.stream.state == Stream::State::open ? Stream::State::half_closed_remote : Stream::State::closed;
+						client.con.rmtx.unlock();
+					}
+					return count;
 				}
 			}
 			throw std::runtime_error("PHP Post Read Fehlgeschlagen");
