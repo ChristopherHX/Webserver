@@ -182,7 +182,7 @@ namespace Http2
 				{
 					uint64_t maxsize;
 					pos = Integer(pos, maxsize, 5);
-					std::cout << "Compressions maxsize=" << maxsize << "\n";
+					//std::cout << "Compressions maxsize=" << maxsize << "\n";
 				}
 				else if ((*pos & 0x10) != 0)
 				{

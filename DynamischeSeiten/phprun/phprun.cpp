@@ -104,6 +104,7 @@ static int sapi_phprun_send_headers(sapi_headers_struct *sapi_headers)
 		uint32_t length = (wpos - buffer.begin()) - 9;
 		std::reverse_copy((unsigned char*)&length, (unsigned char*)&length + 3, buffer.begin());
 	}
+	client.con.wmtx.lock();
 	if (SSL_write(client.con.cssl, buffer.data(), buffer.size()) <= 0)
 	{
 		throw std::runtime_error("Verbindungsfehler");
@@ -350,6 +351,7 @@ void requesthandler(Server & server, Connection & con, Stream & stream, fs::path
 			{
 				throw std::runtime_error("Verbindungsfehler");
 			}
+			con.wmtx.unlock();
 		}
 	}
 	else

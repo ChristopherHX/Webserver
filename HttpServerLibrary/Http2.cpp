@@ -395,57 +395,6 @@ void Http2::Server::filehandler(Server & server, Connection & con, Stream & stre
 					break;
 				}
 			}
-			//else
-			//{
-			//	auto res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), FindKey<std::string, std::string>("content-type"));
-			//	if (res != stream.headerlist.end())
-			//	{
-			//		struct
-			//		{
-			//			std::string contentSeperator;
-			//			std::ofstream fileStream;
-			//			fs::path serverPath;
-			//		} args;
-			//		args.contentSeperator = "--" + Http::Values(res->second)["boundary"];
-			//		args.serverPath = filepath;
-			//		stream.datahandler = [&con, &args](Frame & frame)->void {
-			//			int contentSeperatorI = buffer.indexof(args.contentSeperator);
-			//			if (args.fileStream.is_open() && (contentSeperatorI == -1 || contentSeperatorI > 2))
-			//			{
-			//				const int data = contentSeperatorI == -1 ? (buffer.length() - args.contentSeperator.length() + 1) : (contentSeperatorI - 2);
-			//				buffer.MoveTo(args.fileStream, data);
-			//				return contentSeperatorI == -1 ? 0 : 2;
-			//			}
-			//			else if (contentSeperatorI != -1)
-			//			{
-			//				int offset = contentSeperatorI + args.contentSeperator.length(), fileHeader = buffer.indexof("\r\n\r\n", 4, offset);
-			//				if (fileHeader != -1)
-			//				{
-			//					if (args.fileStream.is_open())
-			//					{
-			//						args.fileStream.close();
-			//					}
-			//					std::string name = Http::Parameter(std::string(buffer.begin() + offset + 2, buffer.begin() + fileHeader))["Content-Disposition"]["name"];
-			//					args.fileStream.open((args.serverPath / name.substr(1, name.length() - 2)), std::ios::binary);
-			//					return fileHeader + 4;
-			//				}
-			//				fileHeader = buffer.indexof("--\r\n", 4, offset);
-			//				if (fileHeader != -1)
-			//				{
-			//					if (args.fileStream.is_open())
-			//					{
-			//						args.fileStream.close();
-			//					}
-			//					auto &responseHeader = buffer.response();
-			//					responseHeader.status = Ok;
-			//					buffer.Send(responseHeader.toString());
-			//					return ~(fileHeader + 4);
-			//				}
-			//			}
-			//		};
-			//		break;
-			//	}
-			//}
 		}
 	}
 	else
@@ -744,9 +693,13 @@ void Server::connectionshandler()
 							std::cout << str << ":" << ntohs(con.address.sin6_port) << " Getrennt\n";
 						}
 						FD_CLR(con.csocket, &sockets);
-						SSL_free(con.cssl);
-						con.cssl = 0;
-						Http::CloseSocket(con.csocket);
+						if (con.wmtx.try_lock())
+						{
+							SSL_free(con.cssl);
+							con.cssl = 0;
+							Http::CloseSocket(con.csocket);
+							con.wmtx.unlock();
+						}
 					}
 				}
 			}
