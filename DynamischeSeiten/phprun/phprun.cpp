@@ -105,7 +105,7 @@ static int sapi_phprun_send_headers(sapi_headers_struct *sapi_headers)
 		std::reverse_copy((unsigned char*)&length, (unsigned char*)&length + 3, buffer.begin());
 	}
 	client.con.wmtx.lock();
-	if (SSL_write(client.con.cssl, buffer.data(), buffer.size()) <= 0)
+	if (SSL_write(client.con.cssl, buffer.data(), wpos - buffer.begin()) <= 0)
 	{
 		throw std::runtime_error("Verbindungsfehler");
 	}
@@ -135,7 +135,9 @@ static size_t sapi_phprun_read_post(char *buf, size_t count_bytes)
 					}
 					return count;
 				}
+				std::cout << "frame.type:" << (uint8_t)frame.type << "frame.length: " << frame.length << "/" << client.con.settings[(uint16_t)Settings::MAX_FRAME_SIZE] << "\r\n";
 			}
+			
 			throw std::runtime_error("PHP Post Read Fehlgeschlagen");
 			return -1;
 		}
@@ -161,10 +163,10 @@ static void sapi_phprun_register_variables(zval *track_vars_array)
 	auto &client = *(PHPClientData*)SG(server_context);
 	for (auto &variable : client.env)
 	{
-		size_t len;
-		const char* value = variable.second.data();
-		if (sapi_module.input_filter(PARSE_SERVER, (char*)variable.first.data(), (char**)&value, variable.second.length(), &len)) {
-			php_register_variable((char*)variable.first.data(), (char*)variable.second.data(), track_vars_array);
+		size_t value_len;
+		char *key = (char*)variable.first.data(), *value = (char*)variable.second.data();
+		if (sapi_module.input_filter(PARSE_SERVER, key, &value, variable.second.length(), &value_len)) {
+			php_register_variable_safe(key, value, value_len, track_vars_array);
 		}
 	}
 }
@@ -175,7 +177,7 @@ static void sapi_phprun_log_message(char *message
 #endif
 )
 {
-	std::cout << "PHP Message: '" << message << "'\n";
+	std::cout << "PHP: '" << message << "'\n";
 }
 
 static sapi_module_struct phprun_sapi_module = {
@@ -195,7 +197,7 @@ static sapi_module_struct phprun_sapi_module = {
 
 	php_error,						/* error handler */
 
-	NULL/*header_handler*/,					/* header handler */
+	NULL,							/* header handler */
 	sapi_phprun_send_headers,		/* send headers handler */
 	NULL,							/* send header handler */
 
@@ -204,7 +206,7 @@ static sapi_module_struct phprun_sapi_module = {
 
 	sapi_phprun_register_variables,	/* register server variables */
 	sapi_phprun_log_message,		/* Log message */
-	/*php_phprun_get_request_time*/NULL,	/* Get request time */
+	NULL,							/* Get request time */
 	NULL,							/* Child terminate */
 
 	STANDARD_SAPI_MODULE_PROPERTIES
@@ -265,78 +267,128 @@ void requesthandler(Server & server, Connection & con, Stream & stream, fs::path
 			SG(request_info).query_string = (char*)args.c_str();
 			SG(request_info).proto_num = 200;
 			SG(request_info).path_translated = (char *)phpfilestring.c_str();
+			SG(request_info).content_length = 0;
 			info.env.push_back({ "DOCUMENT_ROOT", server.GetRootPath().u8string() });
 			info.env.push_back({ "HTTPS", "1" });
 			info.env.push_back({ "SERVER_PROTOCOL", "HTTP/2.0" });
 			info.env.push_back({ "HTTP_CONNECTION", "Keep-Alive" });
 			info.env.push_back({ "SCRIPT_FILENAME", phpfilestring });
 			info.env.push_back({ "QUERY_STRING", args });
+			for (auto &entry : stream.headerlist)
 			{
-				auto res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == ":path"; });
-				if (res != stream.headerlist.end())
+				if (entry.first == ":path")
 				{
-					SG(request_info).request_uri = (char*)res->second.c_str();
-					info.env.push_back({ "REQUEST_URI", res->second });
+					SG(request_info).request_uri = (char*)entry.second.c_str();
+					info.env.push_back({ "REQUEST_URI", entry.second });
 					{
-						std::string val = res->second.substr(0, res->second.find('?'));
+						std::string val = entry.second.substr(0, entry.second.find('?'));
 						info.env.push_back({ "PHP_SELF", val });
 						info.env.push_back({ "SCRIPT_NAME", val });
 					}
 				}
-				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == ":authority"; });
-				if (res != stream.headerlist.end())
+				else if (entry.first == ":authority")
 				{
-					info.env.push_back({ "HTTP_HOST", res->second });
+					info.env.push_back({ "HTTP_HOST", entry.second });
 				}
-				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == ":method"; });
-				if (res != stream.headerlist.end())
+				else if (entry.first == ":method")
 				{
-					SG(request_info).request_method = res->second.c_str();
-					info.env.push_back({ "REQUEST_METHOD", res->second });
+					SG(request_info).request_method = entry.second.c_str();
+					info.env.push_back({ "REQUEST_METHOD", entry.second });
 				}
-				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "content-length"; });
-				SG(request_info).content_length = res != stream.headerlist.end() ? (int64_t)std::stoll(res->second) : 0;
-				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "content-type"; });
-				if (res != stream.headerlist.end())
+				else if (entry.first == "content-length")
 				{
-					SG(request_info).content_type = res->second.c_str();
+					SG(request_info).content_length = (int64_t)std::stoll(entry.second);
 				}
-				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "accept"; });
-				if (res != stream.headerlist.end())
+				else if (entry.first == "content-type")
 				{
-					info.env.push_back({ "HTTP_ACCEPT", res->second });
+					SG(request_info).content_type = entry.second.c_str();
 				}
-				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "accept-charset"; });
-				if (res != stream.headerlist.end())
+				else if (entry.first == "accept")
 				{
-					info.env.push_back({ "HTTP_ACCEPT_CHARSET", res->second });
+					info.env.push_back({ "HTTP_ACCEPT", entry.second });
 				}
-				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "accept-encoding"; });
-				if (res != stream.headerlist.end())
+				else if (entry.first == "accept-charset")
 				{
-					info.env.push_back({ "HTTP_ACCEPT_ENCODING", res->second });
+					info.env.push_back({ "HTTP_ACCEPT_CHARSET", entry.second });
 				}
-				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "accept-language"; });
-				if (res != stream.headerlist.end())
+				else if (entry.first == "accept-encoding")
 				{
-					info.env.push_back({ "HTTP_ACCEPT_LANGUAGE", res->second });
+					info.env.push_back({ "HTTP_ACCEPT_ENCODING", entry.second });
 				}
-				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "referer"; });
-				if (res != stream.headerlist.end())
+				else if (entry.first == "accept-language")
 				{
-					info.env.push_back({ "HTTP_REFERER", res->second });
+					info.env.push_back({ "HTTP_ACCEPT_LANGUAGE", entry.second });
 				}
-				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == ":autority"; });
-				if (res != stream.headerlist.end())
+				else if (entry.first == "referer")
 				{
-					info.env.push_back({ "HTTP_HOST", res->second });
+					info.env.push_back({ "HTTP_REFERER", entry.second });
 				}
-				res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "user-agent"; });
-				if (res != stream.headerlist.end())
+				else if (entry.first == "user-agent")
 				{
-					info.env.push_back({ "HTTP_USER_AGENT", res->second });
+					info.env.push_back({ "HTTP_USER_AGENT", entry.second });
 				}
 			}
+			//{
+			//	auto res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == ":path"; });
+			//	if (res != stream.headerlist.end())
+			//	{
+			//		SG(request_info).request_uri = (char*)res->second.c_str();
+			//		info.env.push_back({ "REQUEST_URI", res->second });
+			//		{
+			//			std::string val = res->second.substr(0, res->second.find('?'));
+			//			info.env.push_back({ "PHP_SELF", val });
+			//			info.env.push_back({ "SCRIPT_NAME", val });
+			//		}
+			//	}
+			//	res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == ":authority"; });
+			//	if (res != stream.headerlist.end())
+			//	{
+			//		info.env.push_back({ "HTTP_HOST", res->second });
+			//	}
+			//	res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == ":method"; });
+			//	if (res != stream.headerlist.end())
+			//	{
+			//		SG(request_info).request_method = res->second.c_str();
+			//		info.env.push_back({ "REQUEST_METHOD", res->second });
+			//	}
+			//	res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "content-length"; });
+			//	SG(request_info).content_length = res != stream.headerlist.end() ? (int64_t)std::stoll(res->second) : 0;
+			//	res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "content-type"; });
+			//	if (res != stream.headerlist.end())
+			//	{
+			//		SG(request_info).content_type = res->second.c_str();
+			//	}
+			//	res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "accept"; });
+			//	if (res != stream.headerlist.end())
+			//	{
+			//		info.env.push_back({ "HTTP_ACCEPT", res->second });
+			//	}
+			//	res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "accept-charset"; });
+			//	if (res != stream.headerlist.end())
+			//	{
+			//		info.env.push_back({ "HTTP_ACCEPT_CHARSET", res->second });
+			//	}
+			//	res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "accept-encoding"; });
+			//	if (res != stream.headerlist.end())
+			//	{
+			//		info.env.push_back({ "HTTP_ACCEPT_ENCODING", res->second });
+			//	}
+			//	res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "accept-language"; });
+			//	if (res != stream.headerlist.end())
+			//	{
+			//		info.env.push_back({ "HTTP_ACCEPT_LANGUAGE", res->second });
+			//	}
+			//	res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "referer"; });
+			//	if (res != stream.headerlist.end())
+			//	{
+			//		info.env.push_back({ "HTTP_REFERER", res->second });
+			//	}
+			//	res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "user-agent"; });
+			//	if (res != stream.headerlist.end())
+			//	{
+			//		info.env.push_back({ "HTTP_USER_AGENT", res->second });
+			//	}
+			//}
 #ifndef ZTS
 			phpsync.lock();
 #endif

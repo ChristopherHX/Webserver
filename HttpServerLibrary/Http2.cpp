@@ -67,7 +67,7 @@ std::string Http2::ErrorCodes[] = {
 	"HTTP_1_1_REQUIRED"
 };
 
-Http2::Server::Server(const std::experimental::filesystem::path & certroot, const std::experimental::filesystem::path & rootpath) : conhandler(/*std::thread::hardware_concurrency()*/4), running(true), rootpath(rootpath)
+Http2::Server::Server(const std::experimental::filesystem::path & certroot, const std::experimental::filesystem::path & rootpath) : conhandler(std::thread::hardware_concurrency()), running(true), rootpath(rootpath)
 {
 #ifdef _WIN32
 	{
@@ -150,6 +150,7 @@ Server::~Server()
 	{
 		if (con.csocket != -1 && con.rmtx.try_lock())
 		{
+			SSL_shutdown(con.cssl);
 			SSL_free(con.cssl);
 			Http::CloseSocket(con.csocket);
 			con.rmtx.unlock();
@@ -224,7 +225,7 @@ bool Http2::ReadUntil(SSL *ssl, uint8_t * buffer, int length)
 
 Stream & GetStream(std::vector<Stream> &streams, uint32_t streamIndentifier)
 {
-	std::cout << "Get Stream: " << streamIndentifier << "\n";
+	//std::cout << "Get Stream: " << streamIndentifier << "\n";
 	while (true)
 	{
 		auto res = std::find_if(streams.begin(), streams.end(), [streamIndentifier](const Stream &stream) -> bool { return stream.indentifier == streamIndentifier; });
@@ -234,7 +235,7 @@ Stream & GetStream(std::vector<Stream> &streams, uint32_t streamIndentifier)
 		}
 		else
 		{
-			std::cout << "Got Stream: " << res->indentifier << "\n";
+			//std::cout << "Got Stream: " << res->indentifier << "\n";
 			return *res;
 		}
 	}
@@ -466,6 +467,7 @@ void Server::connectionshandler()
 				std::vector<uint8_t> buffer(sizeof(http2preface) - 1);
 				if (!ReadUntil(connection.cssl, buffer.data(), buffer.size()) || memcmp(http2preface, buffer.data(), buffer.size()))
 				{
+					SSL_shutdown(connection.cssl);
 					SSL_free(connection.cssl);
 					Http::CloseSocket(connection.csocket);
 				}
@@ -692,20 +694,24 @@ void Server::connectionshandler()
 					}
 					catch (std::exception & ex)
 					{
+						con.rmtx.lock();
+						FD_CLR(con.csocket, &sockets);
 						std::cout << "std::exception what() \"" << ex.what() << "\"\n";
 						{
 							char str[INET6_ADDRSTRLEN];
 							inet_ntop(AF_INET6, &(con.address.sin6_addr), str, INET6_ADDRSTRLEN);
 							std::cout << str << ":" << ntohs(con.address.sin6_port) << " Getrennt\n";
 						}
-						FD_CLR(con.csocket, &sockets);
 						if (con.wmtx.try_lock())
 						{
-							SSL_free(con.cssl);
+							SSL * ssltmp = con.cssl;
 							con.cssl = 0;
+							SSL_shutdown(ssltmp);
+							SSL_free(ssltmp);
 							Http::CloseSocket(con.csocket);
 							con.wmtx.unlock();
 						}
+						con.wmtx.unlock();
 					}
 				}
 			}
