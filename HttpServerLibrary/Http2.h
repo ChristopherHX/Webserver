@@ -182,12 +182,14 @@ namespace Http2
 		void connectionshandler();
 		std::vector<std::thread> conhandler;
 		std::vector<Connection> connections;
+		std::mutex connectionsmtx;
 		std::experimental::filesystem::path rootpath;
 		std::vector<std::tuple<std::experimental::filesystem::path, void*, void(*)(Server &, Connection &, Stream &, std::experimental::filesystem::path &, std::string &, std::string &)>> libs;
 	public:
 		Server(const std::experimental::filesystem::path &certroot, const std::experimental::filesystem::path & rootpath);
 		~Server();
 		const std::experimental::filesystem::path & GetRootPath();
+		static void framehandler(Server & server, Connection &con, const Frame & frame);
 		void filehandler(Server & server, Connection & con, Stream & stream, std::experimental::filesystem::path & filepath, std::string & uri, std::string & args);
 	};
 }

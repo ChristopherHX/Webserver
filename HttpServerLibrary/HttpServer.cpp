@@ -2,6 +2,7 @@
 #include "Array.h"
 #include "HttpRequestBuffer.h"
 #include "Http.h"
+#include "utility.h"
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -182,6 +183,16 @@ void Server::OnRequest(std::function<void(RequestArgs&)> onrequest)
 	this->onrequest = onrequest;
 }
 
+//std::string messungjson;
+struct DataLoggerSensor
+{
+	long long id;
+	long long type;
+	double value;
+};
+
+std::vector<DataLoggerSensor> DataLoggerSensoren;
+
 void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 {
 	using namespace std::chrono_literals;
@@ -205,7 +216,97 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 				buffer.Free(header);
 				status.path = buffer.Client() + " -> " + reqest.methode + ":" + reqest.request;
 				if (OnRequest) OnRequest(status);
-				if (!buffer.isSecure())
+				if (reqest.request == "/Arexx/messung.json")
+				{
+					if (reqest.methode == Get)
+					{
+						std::ostringstream content;
+						content << "[";
+						if (DataLoggerSensoren.size())
+						{
+							auto it = DataLoggerSensoren.begin(), end = DataLoggerSensoren.end();
+							while (true)
+							{
+								content << "{\n";
+								content << "\t\"ID\" : \"" << it->id << "\",\n";
+								content << "\t\"TYPE\" : \"" << it->type << "\",\n";
+								content << "\t\"VALUE\" : \"" << it->value << "\"\n";
+								content << "}";
+								if (++it == end)
+								{
+									break;
+								}
+								content << ",\n";
+							}
+						}
+						content << "]";
+						std::string mcontent = content.str();
+						response.status = Ok;
+						response["Connection"]["keep-alive"];
+						response["Content-Length"] = std::to_string(mcontent.length());
+						buffer.Send(response.toString());
+						buffer.Send(mcontent);
+					}
+					else
+					{
+						long long read = buffer.end() - buffer.begin(), length = std::stoll(reqest["Content-Length"].toString());
+						if (read == length)
+						{
+							std::istringstream content(Utility::urlDecode(std::string(buffer.begin(), buffer.end())));
+							DataLoggerSensor sensor;
+							content >> sensor.id;
+							content.ignore(1, '|');
+							content >> sensor.type;
+							content.ignore(1, '|');
+							content >> sensor.value;
+							auto res = std::find_if(DataLoggerSensoren.begin(), DataLoggerSensoren.end(), [&sensor](DataLoggerSensor & entry) {
+								return sensor.id == entry.id && sensor.type == entry.type;
+							});
+							if (res == DataLoggerSensoren.end())
+							{
+								DataLoggerSensoren.push_back(sensor);
+							}
+							else
+							{
+								*res = sensor;
+							}
+							buffer.Free(length);
+							response.status = Ok;
+							buffer.Send(response.toString());
+						}
+						else
+						{
+							buffer.RecvData([&read, length, &response](RequestBuffer &buffer) {
+								if (read == length)
+								{
+									std::istringstream content(Utility::urlDecode(std::string(buffer.begin(), buffer.end())));
+									DataLoggerSensor sensor;
+									content >> sensor.id;
+									content.ignore(1, '|');
+									content >> sensor.type;
+									content.ignore(1, '|');
+									content >> sensor.value;
+									auto res = std::find_if(DataLoggerSensoren.begin(), DataLoggerSensoren.end(), [&sensor](DataLoggerSensor & entry) {
+										return sensor.id == entry.id && sensor.type == entry.type;
+									});
+									if (res == DataLoggerSensoren.end())
+									{
+										DataLoggerSensoren.push_back(sensor);
+									}
+									else
+									{
+										*res = sensor;
+									}
+									buffer.Free(length);
+									response.status = Ok;
+									buffer.Send(response.toString());
+								}
+								return 0;
+							});
+						}
+					}
+				}
+				else if (!buffer.isSecure())
 				{
 					if (!reqest.Exists("Host"))
 					{
@@ -245,27 +346,6 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 						//dlclose(lib);
 						return count;
 					}
-//					else if (ext == ".php")
-//					{
-//#ifdef _WIN32
-//						throw ServerError(u8"PHP Dateien können noch nicht ausgeführt werden");
-//#else
-//						std::cout << "sapi starting\n";
-//						sapi_startup(&phpplugin);
-//						std::cout << "sapi started\n";
-//						php_request_startup();
-//						std::cout << "php starting\n";
-//						zend_file_handle file;
-//						file.type = ZEND_HANDLE_FILENAME;
-//						file.filename = filepath.c_str();
-//						file.free_filename = 0;
-//						file.opened_path = NULL;
-//						std::cout << "php executing\n";
-//						php_execute_script(&file);
-//						sapi_shutdown();
-//						std::cout << "sapi shutdown\n";
-//#endif
-//					}
 					else if(reqest.methode == Get || reqest.methode == Head)
 					{
 						response["Accept-Ranges"] = "bytes";

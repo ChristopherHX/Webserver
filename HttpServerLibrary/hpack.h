@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include <mutex>
 
 namespace Http2
 {
@@ -23,8 +24,12 @@ namespace Http2
 		{
 		private:
 			std::vector<std::pair<std::string, std::string>> dynamictable;
+			std::mutex headerblock;
 		public:
 			Encoder();
+			Encoder(Http2::HPack::Encoder && encoder);
+			Encoder(const Http2::HPack::Encoder & encoder);
+			Http2::HPack::Encoder & operator=(const Http2::HPack::Encoder & encoder);
 			void ClearDynamicTable();
 			template<class _FwdIt>
 			_FwdIt Headerblock(_FwdIt pos, const std::vector<std::pair<std::string, std::string>>& headerlist);
@@ -41,8 +46,12 @@ namespace Http2
 		{
 		private:
 			std::vector<std::pair<std::string, std::string>> dynamictable;
+			std::mutex headerblock;
 		public:
 			Decoder();
+			Decoder(Http2::HPack::Decoder && decoder);
+			Decoder(const Http2::HPack::Decoder & decoder);
+			Http2::HPack::Decoder & operator=(const Http2::HPack::Decoder &);
 			void ClearDynamicTable();
 			template<class _FwdIt>
 			_FwdIt Headerblock(_FwdIt pos, _FwdIt end, std::vector<std::pair<std::string, std::string>>& headerlist);
@@ -56,6 +65,7 @@ namespace Http2
 		template<class _FwdIt>
 		inline _FwdIt Encoder::Headerblock(_FwdIt pos, const std::vector<std::pair<std::string, std::string>>& headerlist)
 		{
+			headerblock.lock();
 			for (auto & entry : headerlist) {
 				auto res = std::find(StaticTable, StaticTable + 61, entry);
 				if (res != (StaticTable + 61))
@@ -65,11 +75,11 @@ namespace Http2
 				}
 				else
 				{
-					auto res = std::find(dynamictable.rbegin(), dynamictable.rend(), entry);
-					if (res != dynamictable.rend())
+					auto res = std::find(dynamictable.begin(), dynamictable.end(), entry);
+					if (res != dynamictable.end())
 					{
 						*pos = 0x80;
-						pos = Integer(pos, (res - dynamictable.rbegin()) + 62, 7);
+						pos = Integer(pos, (dynamictable.begin() - res) + 62, 7);
 					}
 					else
 					{
@@ -81,10 +91,10 @@ namespace Http2
 						}
 						else
 						{
-							auto res = std::find_if(dynamictable.rbegin(), dynamictable.rend(), [&key = entry.first](const std::pair<std::string, std::string> & pair){ return pair.first == key; });
-							if (res != dynamictable.rend())
+							auto res = std::find_if(dynamictable.begin(), dynamictable.end(), [&key = entry.first](const std::pair<std::string, std::string> & pair){ return pair.first == key; });
+							if (res != dynamictable.end())
 							{
-								pos = Integer(pos, (res - dynamictable.rbegin()) + 62, 6);
+								pos = Integer(pos, (dynamictable.begin() - res) + 62, 6);
 							}
 							else
 							{
@@ -96,6 +106,7 @@ namespace Http2
 					}
 				}
 			}
+			headerblock.unlock();
 			return pos;
 		}
 		template<class _FwdIt>
@@ -136,17 +147,19 @@ namespace Http2
 		template<class _FwdIt>
 		inline _FwdIt Decoder::Headerblock(_FwdIt pos, _FwdIt end, std::vector<std::pair<std::string, std::string>>& headerlist)
 		{
+			headerblock.lock();
 			while (pos != end)
 			{
 				if ((*pos & 0x80) != 0)
 				{
 					uint64_t index;
 					pos = Integer(pos, index, 7);
-					if (index > (62 + dynamictable.size()) || index == 0)
+					if (index >= (62 + dynamictable.size()) || index == 0)
 					{
+						headerblock.unlock();
 						throw std::runtime_error("Compressionsfehler invalid index");
 					}
-					auto & el = index < 62 ? StaticTable[index - 1] : *(dynamictable.rbegin() + (index - 62));
+					auto & el = index < 62 ? StaticTable[index - 1] : *(dynamictable.end() - (index - 61));
 					headerlist.push_back(el);
 				}
 				else if ((*pos & 0x40) != 0)
@@ -162,17 +175,20 @@ namespace Http2
 					{
 						if (index > (62 + dynamictable.size()) || index == 0)
 						{
+							headerblock.unlock();
 							throw std::runtime_error("Compressionsfehler invalid index");
 						}
-						key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictable.rbegin() + (index - 62))).first;
+						key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictable.end() - (index - 61))).first;
 					}
 					if (key == "")
 					{
+						headerblock.unlock();
 						throw std::runtime_error("Compressionsfehler");
 					}
 					pos = String(pos, value);
 					if (value == "")
 					{
+						headerblock.unlock();
 						throw std::runtime_error("Compressionsfehler");
 					}
 					headerlist.push_back({ key, value });
@@ -197,17 +213,20 @@ namespace Http2
 					{
 						if (index > (62 + dynamictable.size()) || index == 0)
 						{
+							headerblock.unlock();
 							throw std::runtime_error("Compressionsfehler invalid index");
 						}
-						key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictable.rbegin() + (index - 62))).first;
+						key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictable.end() - (index - 61))).first;
 					}
 					if (key == "")
 					{
+						headerblock.unlock();
 						throw std::runtime_error("Compressionsfehler");
 					}
 					pos = String(pos, value);
 					if (value == "")
 					{
+						headerblock.unlock();
 						throw std::runtime_error("Compressionsfehler");
 					}
 					headerlist.push_back({ key, value });
@@ -225,27 +244,31 @@ namespace Http2
 					{
 						if (index > (62 + dynamictable.size()) || index == 0)
 						{
+							headerblock.unlock();
 							throw std::runtime_error("Compressionsfehler invalid index");
 						}
-						key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictable.rbegin() + (index - 62))).first;
+						key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictable.end() - (index - 61))).first;
 					}
 					if (key == "")
 					{
+						headerblock.unlock();
 						throw std::runtime_error("Compressionsfehler");
 					}
 					pos = String(pos, value);
 					if (value == "")
 					{
+						headerblock.unlock();
 						throw std::runtime_error("Compressionsfehler");
 					}
 					headerlist.push_back({ key, value });
 				}
 				if (pos > end)
 				{
+					headerblock.unlock();
 					throw std::runtime_error("Compressionsfehler");
-					return end;
 				}
 			}
+			headerblock.unlock();
 			return pos;
 		}
 		template<class _FwdIt>

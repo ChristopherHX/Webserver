@@ -332,6 +332,22 @@ Http2::HPack::Encoder::Encoder()
 {
 }
 
+Http2::HPack::Encoder::Encoder(Http2::HPack::Encoder && encoder)
+{
+	this->dynamictable = std::move(encoder.dynamictable);
+}
+
+Http2::HPack::Encoder::Encoder(const Http2::HPack::Encoder & encoder)
+{
+	this->dynamictable = std::move(encoder.dynamictable);
+}
+
+Http2::HPack::Encoder &Http2::HPack::Encoder::operator =(const Http2::HPack::Encoder & encoder)
+{
+	this->dynamictable = std::move(encoder.dynamictable);
+	return *this;
+}
+
 void Http2::HPack::Encoder::ClearDynamicTable()
 {
 	dynamictable.clear();
@@ -363,6 +379,22 @@ std::vector<uint8_t> Encoder::Huffman(const std::string & string)
 Http2::HPack::Decoder::Decoder()
 {
 
+}
+
+Http2::HPack::Decoder::Decoder(Http2::HPack::Decoder && decoder)
+{
+	this->dynamictable = std::move(decoder.dynamictable);
+}
+
+Http2::HPack::Decoder::Decoder(const Http2::HPack::Decoder & decoder)
+{
+	this->dynamictable = std::move(decoder.dynamictable);
+}
+
+Http2::HPack::Decoder &Http2::HPack::Decoder::operator =(const Http2::HPack::Decoder & decoder)
+{
+	this->dynamictable = std::move(decoder.dynamictable);
+	return *this;
 }
 
 void Http2::HPack::Decoder::ClearDynamicTable()
