@@ -1,0 +1,2 @@
+New-NetFirewallRule -DisplayName "Webserver C++" -Action Allow -Description "Erlaube Http und Https" -Direction Inbound -Enabled True -LocalPort 80,443 -Name "Webserver" -Program "C:\Data\Users\Administrator\Documents
+\WebServer.exe" -Protocol "TCP"

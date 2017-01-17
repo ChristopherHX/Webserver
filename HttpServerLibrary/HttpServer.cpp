@@ -42,6 +42,7 @@
 #include <iostream>
 #include <cstdio>
 #include <list>
+#include <iomanip>
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -71,8 +72,10 @@ void Server::Starten(const int httpPort, const int httpsPort)
 #endif
 	SSL_CTX* ctx = nullptr;
 	fs::path certroot =
-#ifdef _WIN32
-		"../../"
+#if defined(_WIN32) && defined(_DEBUG)
+		"../.."
+#elif defined(_WIN32)
+		"."
 #else
 		"/etc/letsencrypt/live/p4fdf5699.dip0.t-ipconnect.de/"
 #endif
@@ -84,7 +87,6 @@ void Server::Starten(const int httpPort, const int httpsPort)
 	if (fs::is_regular_file(publicchain) && fs::is_regular_file(privatekey))
 	{
 		OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, nullptr);
-		//OPENSSL_init_ssl(0, nullptr);
 		ctx = SSL_CTX_new(TLS_server_method());
 		
 		if (SSL_CTX_use_certificate_chain_file(ctx, publicchain.u8string().data()) < 0) {
@@ -131,7 +133,7 @@ void Server::Starten(const int httpPort, const int httpsPort)
 		FD_ZERO(&sockets);
 		while (servermainstop.load())
 		{
-			timeout.tv_sec = 5;
+			timeout.tv_sec = 1;
 			timeout.tv_usec = 0;
 			if (httpServerSocket != -1)	FD_SET(httpServerSocket, &sockets);
 			if (httpsServerSocket != -1)FD_SET(httpsServerSocket, &sockets);
@@ -175,7 +177,7 @@ void Server::Stoppen()
 
 void Server::SetRootFolder(const fs::path &path)
 {
-	rootfolder = fs::canonical(path);
+	rootfolder = path;
 }
 
 void Server::OnRequest(std::function<void(RequestArgs&)> onrequest)
@@ -222,7 +224,7 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 					{
 						std::ostringstream content;
 						content << "[";
-						if (DataLoggerSensoren.size())
+						if (DataLoggerSensoren.size() > 0)
 						{
 							auto it = DataLoggerSensoren.begin(), end = DataLoggerSensoren.end();
 							while (true)
@@ -230,13 +232,13 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 								content << "{\n";
 								content << "\t\"ID\" : \"" << it->id << "\",\n";
 								content << "\t\"TYPE\" : \"" << it->type << "\",\n";
-								content << "\t\"VALUE\" : \"" << it->value << "\"\n";
+								content << "\t\"VALUE\" : \"" << std::fixed  << std::setprecision(1) << it->value << "\"\n";
 								content << "}";
 								if (++it == end)
 								{
 									break;
 								}
-								content << ",\n";
+								content << ",";
 							}
 						}
 						content << "]";

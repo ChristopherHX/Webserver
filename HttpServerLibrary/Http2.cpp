@@ -106,6 +106,14 @@ Http2::Server::Server(const std::experimental::filesystem::path & certroot, cons
 		{
 			throw std::runtime_error(u8"IPV6_V6ONLY konnte nicht deaktiviert werden");
 		}
+		val = 1;
+		if (setsockopt(ssocket, IPPROTO_TCP, TCP_FASTOPEN, (const char*)&val, sizeof(val)) != 0)
+		{
+			throw std::runtime_error(u8"TCP_FASTOPEN konnte nicht aktiviert werden");
+
+			// Fehler konnte TCP-Fastopen nicht aktivieren
+		}
+
 	}
 	{
 		sockaddr_in6 serverAdresse;
