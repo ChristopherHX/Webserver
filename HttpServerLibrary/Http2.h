@@ -25,19 +25,6 @@
 #define closesocket(socket) close(socket)
 #endif
 
-/*template<class T1, class T2>
-class FindKey
-{
-private:
-        const T1 &key;
-public:
-        FindKey(const T1& key) : key(key) {}
-        bool operator()(const std::pair<T1, T2> &pair)
-        {
-                return pair.first == key;
-        }
-};*/
-
 namespace Http2
 {
 	namespace HPack
@@ -183,12 +170,13 @@ namespace Http2
 		std::vector<std::thread> conhandler;
 		std::vector<Connection> connections;
 		std::mutex connectionsmtx;
-		std::experimental::filesystem::path rootpath;
+		std::experimental::filesystem::path webroot;
 		std::vector<std::tuple<std::experimental::filesystem::path, void*, void(*)(Server &, Connection &, Stream &, std::experimental::filesystem::path &, std::string &, std::string &)>> libs;
 	public:
-		Server(const std::experimental::filesystem::path &certroot, const std::experimental::filesystem::path & rootpath);
+		Server(const std::experimental::filesystem::path &privatekey, const std::experimental::filesystem::path &publiccertificate, const std::experimental::filesystem::path & webroot);
+		const std::experimental::filesystem::path & getWebroot();
 		~Server();
-		const std::experimental::filesystem::path & GetRootPath();
+		static void processHeaderblock(Server & server, Connection & con, Stream & stream);
 		static void framehandler(Server & server, Connection &con, const Frame & frame);
 		void filehandler(Server & server, Connection & con, Stream & stream, std::experimental::filesystem::path & filepath, std::string & uri, std::string & args);
 	};

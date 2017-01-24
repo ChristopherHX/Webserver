@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 2.6)
-project (WebServer-cpp)
+project (WebServer-c++)
 
 add_compile_options(-std=c++14)
 

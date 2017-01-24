@@ -34,7 +34,7 @@
 //	php_startup
 //};
 //
-//int seite(fs::path & rootfolder, request & requestHeader, response& responseHeader, RequestBuffer& buffer, DualByteArray& array)
+//int seite(fs::path & webroot, request & requestHeader, response& responseHeader, RequestBuffer& buffer, DualByteArray& array)
 //{
 //	sapi_startup(&phpplugin);
 //	

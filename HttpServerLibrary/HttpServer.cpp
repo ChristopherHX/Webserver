@@ -8,8 +8,8 @@
 #include <ws2tcpip.h>
 #pragma comment(lib, "Ws2_32.lib")
 #undef max
-//#define libext ".dll"
-#define libext ".so"
+#define libext ".dll"
+//#define libext ".so"
 #define dlopen(name) LoadLibraryW(name)
 #define dlsym(lib, symbol) GetProcAddress(lib, symbol)
 #define dlclose(lib) FreeLibrary(lib)
@@ -50,18 +50,9 @@
 using namespace Http;
 namespace fs = std::experimental::filesystem;
 
-Server::Server()
+Server::Server(const std::experimental::filesystem::path &privatekey, const std::experimental::filesystem::path &publiccertificate, const std::experimental::filesystem::path & webroot) : webroot(webroot)
 {
 	servermainstop.store(false);
-}
-
-Server::~Server()
-{
-	Stoppen();
-}
-
-void Server::Starten(const int httpPort, const int httpsPort)
-{
 	if (servermainstop.load())
 		return;
 #ifdef _WIN32
@@ -80,16 +71,14 @@ void Server::Starten(const int httpPort, const int httpsPort)
 		"/etc/letsencrypt/live/p4fdf5699.dip0.t-ipconnect.de/"
 #endif
 		;
-	fs::path publicchain = certroot / "fullchain.pem";
-	fs::path privatekey = certroot / "privkey.pem";
 	httpServerSocket = -1;
 	httpsServerSocket = -1;
-	if (fs::is_regular_file(publicchain) && fs::is_regular_file(privatekey))
+	if (fs::is_regular_file(privatekey) && fs::is_regular_file(publiccertificate))
 	{
 		OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, nullptr);
 		ctx = SSL_CTX_new(TLS_server_method());
-		
-		if (SSL_CTX_use_certificate_chain_file(ctx, publicchain.u8string().data()) < 0) {
+
+		if (SSL_CTX_use_certificate_chain_file(ctx, publiccertificate.u8string().data()) < 0) {
 			int i;
 			ERR_print_errors_cb([](const char *str, size_t len, void *u) -> int {
 				if ((*((int*)u)) == 0)
@@ -114,7 +103,7 @@ void Server::Starten(const int httpPort, const int httpsPort)
 			return;
 		}
 
-		CreateServerSocket(httpsServerSocket, httpsPort > 0 ? httpsPort : 433);
+		CreateServerSocket(httpsServerSocket, 433);
 	}
 	else
 	{
@@ -122,7 +111,7 @@ void Server::Starten(const int httpPort, const int httpsPort)
 		return;
 	}
 
-	CreateServerSocket(httpServerSocket, httpPort > 0 ? httpPort : 80);
+	CreateServerSocket(httpServerSocket, 80);
 	servermainstop.store(true);
 	servermain = (void*)new std::thread([this, ctx]() {
 		uintptr_t nfds = std::max(httpServerSocket, httpsServerSocket) + 1;
@@ -153,7 +142,7 @@ void Server::Starten(const int httpPort, const int httpsPort)
 					}
 					std::vector<char> client(clientAdresse_len + 6);
 					snprintf(client.data(), client.size(), "%s:%hu", inet_ntop(AF_INET, &clientAdresse.sin_addr, std::vector<char>(clientAdresse_len).data(), clientAdresse_len), ntohs(clientAdresse.sin_port));
-					std::thread(&Server::processRequest, this, std::unique_ptr<RequestBuffer>(new RequestBuffer(clientSocket, 1 << 14, std::string(client.data()), ssl, rootfolder))).detach();
+					std::thread(&Server::processRequest, this, std::unique_ptr<RequestBuffer>(new RequestBuffer(clientSocket, 1 << 14, std::string(client.data()), ssl, this->webroot))).detach();
 				}
 			}
 		}
@@ -161,7 +150,7 @@ void Server::Starten(const int httpPort, const int httpsPort)
 	});
 }
 
-void Server::Stoppen()
+Server::~Server()
 {
 	if (!servermainstop.load())
 		return;
@@ -175,9 +164,9 @@ void Server::Stoppen()
 	delete (std::thread*)servermain;
 }
 
-void Server::SetRootFolder(const fs::path &path)
+void Server::setWebroot(const fs::path &path)
 {
-	rootfolder = path;
+	webroot = path;
 }
 
 void Server::OnRequest(std::function<void(RequestArgs&)> onrequest)

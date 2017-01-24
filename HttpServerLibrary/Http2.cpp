@@ -67,7 +67,7 @@ std::string Http2::ErrorCodes[] = {
 	"HTTP_1_1_REQUIRED"
 };
 
-Http2::Server::Server(const std::experimental::filesystem::path & certroot, const std::experimental::filesystem::path & rootpath) : conhandler(std::thread::hardware_concurrency()), running(true), rootpath(rootpath)
+Http2::Server::Server(const std::experimental::filesystem::path & privatekey, const std::experimental::filesystem::path & publiccertificate, const std::experimental::filesystem::path & webroot) : conhandler(std::thread::hardware_concurrency())
 {
 #ifdef _WIN32
 	{
@@ -76,15 +76,13 @@ Http2::Server::Server(const std::experimental::filesystem::path & certroot, cons
 	}
 #endif
 	{
-		fs::path publicchain = certroot / "fullchain.pem";
-		fs::path privatekey = certroot / "privkey.pem";
-		if (!fs::is_regular_file(publicchain) || !fs::is_regular_file(privatekey))
+		if (!fs::is_regular_file(privatekey) || !fs::is_regular_file(publiccertificate))
 		{
 			throw std::runtime_error("Zertifikat(e) nicht gefunden\nServer kann nicht gestartet werden");
 		}
 		OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, nullptr);
 		sslctx = SSL_CTX_new(TLS_server_method());
-		if (SSL_CTX_use_certificate_chain_file(sslctx, publicchain.u8string().data()) < 0) {
+		if (SSL_CTX_use_certificate_chain_file(sslctx, publiccertificate.u8string().data()) < 0) {
 			throw std::runtime_error(u8"Der Öffentlicher Schlüssel konnte nicht gelesen werden");
 		}
 		if (SSL_CTX_use_PrivateKey_file(sslctx, privatekey.u8string().data(), SSL_FILETYPE_PEM) < 0) {
@@ -110,10 +108,7 @@ Http2::Server::Server(const std::experimental::filesystem::path & certroot, cons
 		if (setsockopt(ssocket, IPPROTO_TCP, TCP_FASTOPEN, (const char*)&val, sizeof(val)) != 0)
 		{
 			throw std::runtime_error(u8"TCP_FASTOPEN konnte nicht aktiviert werden");
-
-			// Fehler konnte TCP-Fastopen nicht aktivieren
 		}
-
 	}
 	{
 		sockaddr_in6 serverAdresse;
@@ -139,9 +134,9 @@ Http2::Server::Server(const std::experimental::filesystem::path & certroot, cons
 	}
 }
 
-const std::experimental::filesystem::path & Http2::Server::GetRootPath()
+const std::experimental::filesystem::path & Http2::Server::getWebroot()
 {
-	return rootpath;
+	return webroot;
 }
 
 Server::~Server()
@@ -223,8 +218,6 @@ bool Http2::ReadUntil(SSL *ssl, uint8_t * buffer, int length)
 			auto res = SSL_read(ssl, buffer, end - buffer);
 			if (res <= 0)
 			{
-				//int error = SSL_get_error(ssl, res);
-				//if(SSL_ERROR_SYSCALL)
 				return false;
 			}
 			buffer += res;
@@ -235,7 +228,6 @@ bool Http2::ReadUntil(SSL *ssl, uint8_t * buffer, int length)
 
 Stream & GetStream(std::vector<Stream> &streams, uint32_t streamIndentifier)
 {
-	//std::cout << "Get Stream: " << streamIndentifier << "\n";
 	while (true)
 	{
 		auto res = std::find_if(streams.begin(), streams.end(), [streamIndentifier](const Stream &stream) -> bool { return stream.indentifier == streamIndentifier; });
@@ -245,7 +237,6 @@ Stream & GetStream(std::vector<Stream> &streams, uint32_t streamIndentifier)
 		}
 		else
 		{
-			//std::cout << "Got Stream: " << res->indentifier << "\n";
 			return *res;
 		}
 	}
@@ -433,20 +424,39 @@ void Http2::Server::filehandler(Server & server, Connection & con, Stream & stre
 	}
 }
 
+void Server::processHeaderblock(Server & server, Connection &con, Stream & stream)
+{
+	auto res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == ":path"; });
+	if (res != stream.headerlist.end())
+	{
+		fs::path filepath = server.getWebroot();
+		std::string args, uri;
+		{
+			size_t pq = res->second.find('?');
+			if (pq != std::string::npos)
+			{
+				args = Utility::urlDecode(String::Replace(res->second.substr(pq + 1), "+", " "));
+				filepath /= Utility::urlDecode(res->second.substr(0, pq));
+			}
+			else
+			{
+				filepath /= Utility::urlDecode(res->second);
+			}
+		}
+		server.filehandler(server, con, stream, filepath, uri, args);
+	}
+}
+
 void Server::framehandler(Server & server, Connection &con, const Frame & frame)
 {
-	//std::cout << "Read Frame: " << (uint32_t)frame.type << " | " << frame.length << "\n";
 	if (((uint8_t)frame.type > (uint8_t)Frame::Type::CONTINUATION) || (frame.length > con.settings[(uint16_t)Settings::MAX_FRAME_SIZE]))
 	{
-		//std::cout << "MAX_FRAME_SIZE=" << con.settings[(uint16_t)Settings::MAX_FRAME_SIZE] << "\n";
-		//std::cout << "CONTINUATION=" << (uint8_t)Frame::Type::CONTINUATION << "\n";
 		con.rmtx.unlock();
 		throw std::runtime_error("Fehler: Invalid Frame");
 	}
 	std::vector<uint8_t> fcontent(frame.length);
 	if (!ReadUntil(con.cssl, fcontent.data(), fcontent.size()))
 	{
-		//std::cout << "Read Frame: " << (uint32_t)frame.type << " | " << frame.length << "\n";
 		con.rmtx.unlock();
 		throw std::runtime_error("Verbindungs Fehler");
 	}
@@ -458,7 +468,7 @@ void Server::framehandler(Server & server, Connection &con, const Frame & frame)
 		case Frame::Type::HEADERS:
 		{
 			uint8_t padlength = 0;
-			if (((uint8_t)frame.flags & (uint8_t)Frame::Flags::END_STREAM))
+			if ((uint8_t)frame.flags & (uint8_t)Frame::Flags::END_STREAM)
 			{
 				con.rmtx.unlock();
 				stream.state = Stream::State::half_closed_remote;
@@ -467,38 +477,21 @@ void Server::framehandler(Server & server, Connection &con, const Frame & frame)
 			{
 				stream.state = Stream::State::open;
 			}
-
-			if (((uint8_t)frame.flags & (uint8_t)Frame::Flags::PADDED))
+			if ((uint8_t)frame.flags & (uint8_t)Frame::Flags::PADDED)
 			{
 				padlength = *pos++;
 			}
-			if (((uint8_t)frame.flags & (uint8_t)Frame::Flags::PRIORITY))
+			if ((uint8_t)frame.flags & (uint8_t)Frame::Flags::PRIORITY)
 			{
 				std::reverse_copy(pos, pos + 4, (unsigned char*)&stream.priority.dependency);
 				pos += 4;
 				stream.priority.weight = *pos++;
 			}
 			pos = con.hdecoder.Headerblock(pos, end - padlength, stream.headerlist);
-			pos = end;
-			auto res = std::find_if(stream.headerlist.begin(), stream.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == ":path"; });
-			if (res != stream.headerlist.end())
+			pos += padlength;
+			if ((uint8_t)frame.flags & (uint8_t)Frame::Flags::END_HEADERS)
 			{
-				fs::path filepath = server.GetRootPath();
-				std::string args, uri;
-				{
-					size_t pq = res->second.find('?');
-					if (pq != std::string::npos)
-					{
-						args = Utility::urlDecode(String::Replace(res->second.substr(pq + 1), "+", " "));
-						filepath /= Utility::urlDecode(res->second.substr(0, pq));
-					}
-					else
-					{
-						filepath /= Utility::urlDecode(res->second);
-					}
-				}
-				//std::cout << "res->second: " << res->second << "\n";
-				server.filehandler(server, con, stream, filepath, uri, args);
+				processHeaderblock(server, con, stream);
 			}
 			break;
 		}
@@ -613,6 +606,13 @@ void Server::framehandler(Server & server, Connection &con, const Frame & frame)
 			pos += 4;
 			break;
 		}
+		case Frame::Type::CONTINUATION:
+			pos = con.hdecoder.Headerblock(pos, end, stream.headerlist);
+			if ((uint8_t)frame.flags & (uint8_t)Frame::Flags::END_HEADERS)
+			{
+				processHeaderblock(server, con, stream);
+			}
+			break;
 		default:
 			con.rmtx.unlock();
 			break;
