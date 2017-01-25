@@ -174,7 +174,6 @@ void Server::OnRequest(std::function<void(RequestArgs&)> onrequest)
 	this->onrequest = onrequest;
 }
 
-//std::string messungjson;
 struct DataLoggerSensor
 {
 	long long id;

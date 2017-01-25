@@ -151,8 +151,9 @@ Server::~Server()
 	}
 	for (Connection & con : connections)
 	{
-		if (con.csocket != -1 && con.rmtx.try_lock())
+		if (con.csocket != -1)
 		{
+			con.rmtx.lock();
 			SSL_shutdown(con.cssl);
 			SSL_free(con.cssl);
 			Http::CloseSocket(con.csocket);
@@ -635,7 +636,6 @@ void Server::connectionshandler()
 			select(nfds, &tmp, nullptr, nullptr, &timeout);
 			active = tmp;
 		}
-
 		if (FD_ISSET(ssocket, &active))
 		{
 			FD_CLR(ssocket, &active);
@@ -683,49 +683,56 @@ void Server::connectionshandler()
 			timeout = { 0,1000 };
 			for (Connection & con : connections)
 			{
-				if ((FD_ISSET(con.csocket, &active) || (con.cssl != 0 && SSL_pending(con.cssl))) && con.rmtx.try_lock())
+				if (con.rmtx.try_lock())
 				{
-					FD_CLR(con.csocket, &active);
-					try
+					if (FD_ISSET(con.csocket, &active) || (con.cssl != 0 && SSL_pending(con.cssl)))
 					{
-						std::vector<uint8_t> framebuf(9);
-						if (!ReadUntil(con.cssl, framebuf.data(), framebuf.size()))
+						FD_CLR(con.csocket, &active);
+						try
 						{
-							con.rmtx.unlock();
-							throw std::runtime_error("Verbindungs Fehler");
-						}
-						{
-							framehandler(*this, con, ReadFrame(framebuf.begin()));
-						}
-					}
-					catch (std::exception & ex)
-					{
-						if (con.cssl != 0)
-						{
-							con.rmtx.lock();
-							FD_CLR(con.csocket, &sockets);
-							std::cout << "std::exception what() \"" << ex.what() << "\"\n";
-							if (con.wmtx.try_lock())
+							std::vector<uint8_t> framebuf(9);
+							if (!ReadUntil(con.cssl, framebuf.data(), framebuf.size()))
 							{
-								if (con.cssl != 0)
-								{
-									SSL * ssltmp = con.cssl;
-									con.cssl = 0;
-									SSL_shutdown(ssltmp);
-									SSL_free(ssltmp);
-									Http::CloseSocket(con.csocket);
-									{
-										char str[INET6_ADDRSTRLEN];
-										inet_ntop(AF_INET6, &(con.address.sin6_addr), str, INET6_ADDRSTRLEN);
-										std::cout << str << ":" << ntohs(con.address.sin6_port) << " Getrennt\n";
-									}
-								}
-								con.wmtx.unlock();
+								con.rmtx.unlock();
+								throw std::runtime_error("Verbindungs Fehler");
 							}
-							con.rmtx.unlock();
+							{
+								framehandler(*this, con, ReadFrame(framebuf.begin()));
+							}
 						}
+						catch (std::exception & ex)
+						{
+							if (con.cssl != 0)
+							{
+								con.rmtx.lock();
+								FD_CLR(con.csocket, &sockets);
+								std::cout << "std::exception what() \"" << ex.what() << "\"\n";
+								if (con.wmtx.try_lock())
+								{
+									if (con.cssl != 0)
+									{
+										SSL * ssltmp = con.cssl;
+										con.cssl = 0;
+										SSL_shutdown(ssltmp);
+										SSL_free(ssltmp);
+										Http::CloseSocket(con.csocket);
+										{
+											char str[INET6_ADDRSTRLEN];
+											inet_ntop(AF_INET6, &(con.address.sin6_addr), str, INET6_ADDRSTRLEN);
+											std::cout << str << ":" << ntohs(con.address.sin6_port) << " Getrennt\n";
+										}
+									}
+									con.wmtx.unlock();
+								}
+								con.rmtx.unlock();
+							}
+						}
+						timeout = { 0,0 };
 					}
-					timeout = { 0,0 };
+					else
+					{
+						con.rmtx.unlock();
+					}
 				}
 			}
 		}
