@@ -1,4 +1,4 @@
-#include "HttpServer.h"
+ï»¿#include "HttpServer.h"
 #include "Http2.h"
 #include <iostream>
 #include <string>
@@ -57,6 +57,12 @@ int main(int argc, const char** argv)
 				webroot = *argv++;
 				argc -= 2;
 			}
+			else if (strcmp(*argv, "-help") == 0)
+			{
+				++argv;
+				--argc;
+				cmd = 0;
+			}
 		}
 		switch (cmd)
 		{
@@ -88,12 +94,12 @@ int main(int argc, const char** argv)
 			break;
 		}
 		default:
-			std::cout << u8"Benutzung vom Server\n";
-			std::cout << u8"-h1 HTTP/1.1 Server\n";
-			std::cout << u8"-h2 HTTP/2.0 Server\n";
-			std::cout << u8"-prikey <pfad> privater Schlüssel\n";
-			std::cout << u8"-pubcert <pfad> öffentliches Zertifikat\n";
-			std::cout << u8"-webroot <pfad> Webroot\n";
+			std::cout << "Benutzung vom Server\n";
+			std::cout << "-h1 HTTP/1.1 Server\n";
+			std::cout << "-h2 HTTP/2.0 Server\n";
+			std::cout << "-prikey <pfad> privater SchlÃ¼ssel\n";
+			std::cout << "-pubcert <pfad> Ã¶ffentliches Zertifikat\n";
+			std::cout << "-webroot <pfad> Webroot\n";
 			break;
 		}
 	}

@@ -342,7 +342,7 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 						{
 							std::vector<char> buf(128);
 							time_t date = fs::file_time_type::clock::to_time_t(fs::last_write_time(filepath));
-							strftime(buf.data(), buf.size(), "%a, %d-%b-%G %H:%M:%S GMT", std::gmtime(&date));
+							strftime(buf.data(), buf.size(), "%a, %d-%b-%Y %H:%M:%S GMT", std::gmtime(&date));
 							if (reqest.Exists("If-Modified-Since") && reqest["If-Modified-Since"].toString() == buf.data())
 							{
 								response.status = NotModified;
@@ -351,7 +351,7 @@ void Server::processRequest(std::unique_ptr<RequestBuffer> buffer)
 							}
 							response["Last-Modified"] = buf.data();
 							time(&date);
-							strftime(buf.data(), buf.size(), "%a, %d-%b-%G %H:%M:%S GMT", std::gmtime(&date));
+							strftime(buf.data(), buf.size(), "%a, %d-%b-%Y %H:%M:%S GMT", std::gmtime(&date));
 							response["Date"] = buf.data();
 						}
 						uintmax_t offset = 0, length = fs::file_size(filepath);

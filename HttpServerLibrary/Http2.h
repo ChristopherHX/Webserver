@@ -7,6 +7,7 @@
 #include <thread>
 #include <mutex>
 #include <experimental/filesystem>
+#include <shared_mutex>
 
 #ifdef _WIN32
 #include <ws2tcpip.h>
@@ -32,6 +33,7 @@ namespace Http2
 		class Encoder;
 		class Decoder;
 	}
+	struct RequestContext;
 	extern std::pair<std::experimental::filesystem::path, std::string> MimeTypeTable[];
 
 	struct Frame
@@ -130,6 +132,7 @@ namespace Http2
 		sockaddr_in6 address;
 		SSL * cssl;
 		std::vector<Stream> streams;
+		std::shared_mutex streamlock;
 		Http2::HPack::Encoder hencoder;
 		Http2::HPack::Decoder hdecoder;
 		uint32_t settings[6];
@@ -164,20 +167,35 @@ namespace Http2
 		bool running;
 		SSL_CTX* sslctx;
 		uintptr_t ssocket;
-		std::mutex libsmtx;
+		std::mutex libsmtx, xtm, ctm;
+		std::shared_mutex cons;
+		int activec;
 		fd_set sockets, active;
 		void connectionshandler();
 		std::vector<std::thread> conhandler;
 		std::vector<Connection> connections;
 		std::mutex connectionsmtx;
 		std::experimental::filesystem::path webroot;
-		std::vector<std::tuple<std::experimental::filesystem::path, void*, void(*)(Server &, Connection &, Stream &, std::experimental::filesystem::path &, std::string &, std::string &)>> libs;
+		std::vector<std::tuple<std::experimental::filesystem::path, void*, void(*)(RequestContext &)>> libs;
 	public:
 		Server(const std::experimental::filesystem::path &privatekey, const std::experimental::filesystem::path &publiccertificate, const std::experimental::filesystem::path & webroot);
 		const std::experimental::filesystem::path & getWebroot();
 		~Server();
-		static void processHeaderblock(Server & server, Connection & con, Stream & stream);
-		static void framehandler(Server & server, Connection &con, const Frame & frame);
-		void filehandler(Server & server, Connection & con, Stream & stream, std::experimental::filesystem::path & filepath, std::string & uri, std::string & args);
+		static void processHeaderblock(RequestContext &rcontext);
+		static void framehandler(RequestContext &rcontext);
+		static Stream & GetStream(std::vector<Stream>& streams, std::shared_mutex & streamsmtx, uint32_t streamIndentifier);
+		void filehandler(RequestContext &rcontext);
+	};
+
+	struct RequestContext
+	{
+		Server &server;
+		Connection & connection;
+		std::unique_lock<std::mutex> conrlock;
+		Frame frame;
+		Stream * stream;
+		std::experimental::filesystem::path path;
+		std::string uri;
+		std::string query;
 	};
 }
