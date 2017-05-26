@@ -1,0 +1,6 @@
+LIBRARY   Http
+EXPORTS
+??0Server@Http@@QAA@ABVpath@v1@filesystem@experimental@std@@00@Z
+??0Server@Http2@@QAA@ABVpath@v1@filesystem@experimental@std@@00@Z
+??1Server@Http@@QAA@XZ
+??1Server@Http2@@QAA@XZ
