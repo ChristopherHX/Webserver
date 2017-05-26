@@ -135,14 +135,14 @@ namespace Http
 			SSL * cssl;
 			std::vector<Stream> streams;
 			std::shared_mutex streamlock;
-			Http2::HPack::Encoder hencoder;
-			Http2::HPack::Decoder hdecoder;
+			HPack::Encoder hencoder;
+			HPack::Decoder hdecoder;
 			uint32_t settings[6];
 
 			Connection();
 			Connection(uintptr_t csocket, const sockaddr_in6 &address);
-			Connection(Http2::Connection && con);
-			Connection(const Http2::Connection & con);
+			Connection(Connection && con);
+			Connection(const Connection & con);
 			~Connection();
 			Connection& operator=(const Connection & con);
 		};

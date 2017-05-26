@@ -1,7 +1,6 @@
 #include "hpack.h"
 #include "Array.h"
 
-
 using namespace Http::V2::HPack;
 
 std::pair<uint32_t, uint8_t> Http::V2::HPack::StaticHuffmanTable[] = {
