@@ -47,5 +47,5 @@ void TLSSocketListener::Listen(IN6_ADDR address, int port)
 
 std::shared_ptr<Socket> TLSSocketListener::Accept()
 {
-	return std::dynamic_pointer_cast<Socket,TLSSocket>(std::make_shared<TLSSocket>(TLSSocket(sslctx, accept(socket, nullptr, nullptr))));
+	return std::make_shared<TLSSocket>(sslctx, accept(socket, nullptr, nullptr));
 }

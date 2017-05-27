@@ -13,18 +13,16 @@ void SocketListener::OnConnection(std::shared_ptr<Socket> socket)
 	std::thread([this, socket]() {
 		_onconnection(socket);
 		clients--;
-	});
+	}).detach();
 }
 
 SocketListener::SocketListener()
 {
 #ifdef _WIN32
-	{
-		WSADATA data;
-		WSAStartup(WINSOCK_VERSION, &data); 
-	}
+	WSADATA data;
+	WSAStartup(WINSOCK_VERSION, &data);
 #endif // _WIN32
-	if(socket = ::socket(AF_INET6, SOCK_STREAM, 0) != -1)
+	if((socket = ::socket(AF_INET6, SOCK_STREAM, 0)) != -1)
 	{
 		uint32_t value = 0;
 		setsockopt(socket, IPPROTO_IPV6, IPV6_V6ONLY, (const char*)&value, sizeof(value));
@@ -59,6 +57,7 @@ void SocketListener::Listen(IN6_ADDR address, int port)
 		saddress.sin6_port = htons(port);
 		if (::bind(socket, (sockaddr *)&saddress, sizeof(saddress)) == -1)
 		{
+			int error = WSAGetLastError();
 			throw std::runtime_error(u8"Can't bind Socket");
 		}
 	}
@@ -66,18 +65,19 @@ void SocketListener::Listen(IN6_ADDR address, int port)
 	{
 		throw std::runtime_error(u8"Can't listen Socket");
 	}
-	listening = std::thread([this]() {
+	//listening = std::thread([this]() {
 		while (true)
 		{
 			auto socket = Accept();
 			OnConnection(socket);
 		}
-	});
+	//});
 }
 
 std::shared_ptr<Socket> SocketListener::Accept()
 {
-	return std::make_shared<Socket>(Socket(accept(socket, nullptr, nullptr)));
+	intptr_t res = accept(socket, nullptr, nullptr);
+	return std::make_shared<Socket>(res);
 }
 
 void SocketListener::SetConnectionHandler(std::function<void(std::shared_ptr<Socket>)> onconnection)

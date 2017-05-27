@@ -336,7 +336,7 @@ Encoder::Encoder(Encoder && encoder)
 	this->dynamictable = std::move(encoder.dynamictable);
 }
 
-Encoder::Encoder(const HPack::Encoder & encoder)
+Encoder::Encoder(const Encoder & encoder)
 {
 	this->dynamictable = std::move(encoder.dynamictable);
 }
