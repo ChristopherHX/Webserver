@@ -40,7 +40,7 @@ void TLSSocketListener::Listen(IN6_ADDR address, int port)
 	SSL_CTX_use_certificate_chain_file(sslctx, publiccertificate.u8string().data());
 	SSL_CTX_set_alpn_select_cb(sslctx, [](SSL * ssl, const unsigned char ** out, unsigned char * outlen, const unsigned char * in, unsigned int inlen, void * args) -> int
 	{
-		return SSL_select_next_proto((unsigned char **)out, outlen, (const unsigned char *)"\x2h2", 3, in, inlen) == OPENSSL_NPN_NEGOTIATED ? 0 : 1;
+		return SSL_select_next_proto((unsigned char **)out, outlen, (const unsigned char *)"\x2h2\bhttp/1.1", 12, in, inlen) == OPENSSL_NPN_NEGOTIATED ? 0 : 1;
 	}, nullptr);
 	SocketListener::Listen(address, port);
 }
@@ -49,6 +49,8 @@ std::shared_ptr<Socket> TLSSocketListener::Accept()
 {
 	sockaddr_in6 addresse;
 	socklen_t size = sizeof(addresse);
-	int socket = accept(this->socket, (sockaddr*)&addresse, &size);
+	intptr_t socket = accept(this->socket, (sockaddr*)&addresse, &size);
+	if (socket == -1)
+		throw std::runtime_error("Accept failed");
 	return std::make_shared<TLSSocket>(sslctx, socket, addresse.sin6_addr, ntohs(addresse.sin6_port));
 }

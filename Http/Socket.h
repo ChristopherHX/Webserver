@@ -1,5 +1,6 @@
 #pragma once
-#include <stdint.h>
+#include <cstdint>
+#include <string>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -14,12 +15,15 @@ namespace Net
 		intptr_t socket;
 		in6_addr address;
 		int port;
+		std::string protocol;
 	public:
 		Socket(intptr_t socket, const in6_addr &address, int port);
 		virtual ~Socket();
 		intptr_t GetSocket();
 		const IN6_ADDR &GetAddress();
 		int GetPort();
+		void SetProtocol(const std::string & protocol);
+		std::string GetProtocol();
 		virtual int Receive(uint8_t * buffer, int length);
 		void ReceiveAll(uint8_t * buffer, int length);
 		virtual int Send(uint8_t * buffer, int length);

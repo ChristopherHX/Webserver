@@ -79,6 +79,8 @@ std::shared_ptr<Socket> SocketListener::Accept()
 	sockaddr_in6 addresse;
 	socklen_t size = sizeof(addresse);
 	int socket = accept(this->socket, (sockaddr*)&addresse, &size);
+	if (socket == -1)
+		throw std::runtime_error("Accept failed");
 	return std::make_shared<Socket>(socket, addresse.sin6_addr, ntohs(addresse.sin6_port));
 }
 

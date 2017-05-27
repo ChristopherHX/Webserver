@@ -30,6 +30,21 @@ const IN6_ADDR & Socket::GetAddress()
 	return address;
 }
 
+int Socket::GetPort()
+{
+	return port;
+}
+
+void Socket::SetProtocol(const std::string & protocol)
+{
+	this->protocol = protocol;
+}
+
+std::string Net::Socket::GetProtocol()
+{
+	return protocol;
+}
+
 int Socket::Receive(uint8_t * buffer, int length)
 {
 	return recv(socket, (char*)buffer, length, 0);
