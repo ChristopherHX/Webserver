@@ -1,10 +1,5 @@
 #include "Socket.h"
 #include <stdexcept>
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <WS2tcpip.h>
-#endif
 
 using namespace Net;
 
@@ -15,9 +10,12 @@ Socket::Socket(intptr_t socket)
 
 Socket::~Socket()
 {
-	shutdown(socket, 2);
-	closesocket(socket);
-	socket = -1;
+	if (socket != -1)
+	{
+		shutdown(socket, 2);
+		closesocket(socket);
+		socket = -1;
+	}
 }
 
 intptr_t Socket::GetSocket()
