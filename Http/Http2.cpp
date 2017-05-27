@@ -2,6 +2,7 @@
 #include "Http.h"
 #include "hpack.h"
 #include "utility.h"
+#include "MimeType.h"
 
 #include <thread>
 #include <algorithm>
@@ -26,31 +27,12 @@
 #endif
 
 using namespace Http::V2;
-using namespace Http::V2::HPack;
+using namespace HPack;
 using namespace Utility;
 using namespace std::chrono_literals;
 namespace fs = std::experimental::filesystem;
 
-std::pair<fs::path, std::string> Http::V2::MimeTypeTable[] = {
-	{ ".html" , "text/html; charset=utf-8" },
-	{ ".css" , "text/css; charset=utf-8" },
-	{ ".js", "text/javascript; charset=utf-8" },
-	{ ".xml" , "text/xml; charset=utf-8" },
-	{ ".json" , "text/json; charset=utf-8" },
-	{ ".svg", "text/svg; charset=utf-8" },
-	{ ".txt" , "text/plain; charset=utf-8" },
-	{ ".png" , "image/png" },
-	{ ".jpg" , "image/jpeg" },
-	{ ".tiff" , "image/tiff" },
-	{ ".fif", "image/fif" },
-	{ ".ief" , "image/ief" },
-	{ ".gif", "image/gif" },
-	{ ".pdf", "application/pdf" },
-	{ ".mpg", "video/mpeg"},
-	{ "", "application/octet-stream" }
-};
-
-std::string Http::V2::ErrorCodes[] = {
+std::string ErrorCodes[] = {
 	"NO_ERROR",
 	"PROTOCOL_ERROR",
 	"INTERNAL_ERROR",
@@ -67,31 +49,31 @@ std::string Http::V2::ErrorCodes[] = {
 	"HTTP_1_1_REQUIRED"
 };
 
-Http::V2::Stream::Stream(uint32_t indentifier)
+Stream::Stream(uint32_t indentifier)
 {
 	this->indentifier = indentifier;
 	this->state = State::idle;
 }
 
-Http::V2::Stream::Priority::Priority()
+Stream::Priority::Priority()
 {
 	dependency = 0;
 	weight = 0;
 }
 
-Http::V2::Connection::Connection()
+Connection::Connection()
 {
 	uint32_t ssettings[] = { 4096, 1, std::numeric_limits<uint32_t>::max(), 65535, 16384, std::numeric_limits<uint32_t>::max() };
 	memcpy(this->settings, ssettings, sizeof(settings));
 }
 
-Http::V2::Connection::Connection(uintptr_t csocket, const sockaddr_in6 &address) : Connection()
+Connection::Connection(uintptr_t csocket, const sockaddr_in6 &address) : Connection()
 {
 	this->csocket = csocket;
 	this->address = address;
 }
 
-Http::V2::Connection::Connection(Http::V2::Connection&& con)
+Connection::Connection(Connection&& con)
 {
 	this->address = con.address;
 	this->csocket = con.csocket;
@@ -105,7 +87,7 @@ Http::V2::Connection::Connection(Http::V2::Connection&& con)
 	memcpy(this->settings, con.settings, sizeof(settings));
 }
 
-Http::V2::Connection::Connection(const Http::V2::Connection& con)
+Connection::Connection(const Connection& con)
 {
 	this->address = con.address;
 	this->csocket = con.csocket;
@@ -116,7 +98,7 @@ Http::V2::Connection::Connection(const Http::V2::Connection& con)
 	memcpy(this->settings, con.settings, sizeof(settings));
 }
 
-Http::V2::Connection::~Connection()
+Connection::~Connection()
 {
 	std::lock(rmtx, wmtx, streamlock);
 	rmtx.unlock();
@@ -124,7 +106,7 @@ Http::V2::Connection::~Connection()
 	streamlock.unlock();
 }
 
-Connection & Http::V2::Connection::operator=(const Connection & con)
+Connection & Connection::operator=(const Connection & con)
 {
 	this->address = con.address;
 	this->csocket = con.csocket;
@@ -136,7 +118,7 @@ Connection & Http::V2::Connection::operator=(const Connection & con)
 	return *this;
 }
 
-Http::V2::Server::Server(const std::experimental::filesystem::path & privatekey, const std::experimental::filesystem::path & publiccertificate, const std::experimental::filesystem::path & webroot) : conhandler(std::thread::hardware_concurrency())
+Server::Server(const std::experimental::filesystem::path & privatekey, const std::experimental::filesystem::path & publiccertificate, const std::experimental::filesystem::path & webroot) : conhandler(std::thread::hardware_concurrency())
 {
 #ifdef _WIN32
 	{
@@ -185,7 +167,7 @@ Http::V2::Server::Server(const std::experimental::filesystem::path & privatekey,
 		serverAdresse.sin6_family = AF_INET6;
 		serverAdresse.sin6_addr = in6addr_any;
 		serverAdresse.sin6_port = htons(443);
-		if (bind(ssocket, (sockaddr *)&serverAdresse, sizeof(serverAdresse)) == -1)
+		if (::bind(ssocket, (sockaddr *)&serverAdresse, sizeof(serverAdresse)) == -1)
 		{
 			throw std::runtime_error(u8"Der Server Socket kann nicht gebunden werden");
 		}
@@ -202,7 +184,7 @@ Http::V2::Server::Server(const std::experimental::filesystem::path & privatekey,
 	}
 }
 
-const std::experimental::filesystem::path & Http::V2::Server::getWebroot()
+const std::experimental::filesystem::path & Server::getWebroot()
 {
 	return webroot;
 }
@@ -244,7 +226,7 @@ Server::~Server()
 	WSACleanup();
 }
 
-bool Http::V2::FindFile(fs::path &filepath, std::string &uri)
+bool FindFile(fs::path &filepath, std::string &uri)
 {
 	if (fs::is_regular_file(filepath))
 	{
@@ -270,7 +252,7 @@ bool Http::V2::FindFile(fs::path &filepath, std::string &uri)
 	}
 }
 
-bool Http::V2::ReadUntil(SSL *ssl, uint8_t * buffer, int length)
+bool ReadUntil(SSL *ssl, uint8_t * buffer, int length)
 {
 	int fd = SSL_get_fd(ssl);
 	timeval tv = { 0,0 };
@@ -299,7 +281,7 @@ bool Http::V2::ReadUntil(SSL *ssl, uint8_t * buffer, int length)
 	return true;
 }
 
-Stream & Http::V2::Server::GetStream(std::vector<Stream> &streams, std::shared_mutex &streamsmtx, uint32_t streamIndentifier)
+Stream & Server::GetStream(std::vector<Stream> &streams, std::shared_mutex &streamsmtx, uint32_t streamIndentifier)
 {
 	while (true)
 	{
@@ -316,7 +298,7 @@ Stream & Http::V2::Server::GetStream(std::vector<Stream> &streams, std::shared_m
 	}
 }
 
-void Http::V2::Server::filehandler(RequestContext &rcontext)
+void Server::filehandler(RequestContext &rcontext)
 {
 	std::vector<std::pair<std::string, std::string>> headerlist;
 	if (FindFile(rcontext.path, rcontext.uri))
@@ -420,7 +402,7 @@ void Http::V2::Server::filehandler(RequestContext &rcontext)
 					}
 					headerlist.push_back({ "content-length", std::to_string(length) });
 					{
-						headerlist.push_back({ "content-type", std::find_if(MimeTypeTable, MimeTypeTable + (sizeof(MimeTypeTable) / sizeof(std::pair<fs::path, std::string>) - 1), [&ext](const std::pair<fs::path, std::string> & pair) { return pair.first == ext; })->second });
+						headerlist.push_back({ "content-type", MimeType::Get(rcontext.path.extension().u8string()) });
 					}
 					if (rcontext.query == "herunterladen")
 					{

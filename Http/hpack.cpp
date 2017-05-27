@@ -3,7 +3,7 @@
 
 using namespace Http::V2::HPack;
 
-std::pair<uint32_t, uint8_t> Http::V2::HPack::StaticHuffmanTable[] = {
+std::pair<uint32_t, uint8_t> StaticHuffmanTable[] = {
 { 0x1ff8, 13},
 { 0x7fffd8, 23 },
 { 0xfffffe2, 28 },
@@ -263,7 +263,7 @@ std::pair<uint32_t, uint8_t> Http::V2::HPack::StaticHuffmanTable[] = {
 { 0xfffffff, 30 }
 };
 
-std::pair<std::string, std::string> Http::V2::HPack::StaticTable[] = {
+std::pair<std::string, std::string> StaticTable[] = {
 	{ ":authority", "" },
 	{ ":method","GET" },
 	{ ":method","POST" },
@@ -327,27 +327,27 @@ std::pair<std::string, std::string> Http::V2::HPack::StaticTable[] = {
 	{ "www-authenticate" , "" }
 };
 
-Http::V2::HPack::Encoder::Encoder()
+Encoder::Encoder()
 {
 }
 
-Http::V2::HPack::Encoder::Encoder(Http::V2::HPack::Encoder && encoder)
-{
-	this->dynamictable = std::move(encoder.dynamictable);
-}
-
-Http::V2::HPack::Encoder::Encoder(const Http::V2::HPack::Encoder & encoder)
+Encoder::Encoder(Encoder && encoder)
 {
 	this->dynamictable = std::move(encoder.dynamictable);
 }
 
-Http::V2::HPack::Encoder &Http::V2::HPack::Encoder::operator =(const Http::V2::HPack::Encoder & encoder)
+Encoder::Encoder(const HPack::Encoder & encoder)
+{
+	this->dynamictable = std::move(encoder.dynamictable);
+}
+
+Encoder &Encoder::operator =(const Encoder & encoder)
 {
 	this->dynamictable = std::move(encoder.dynamictable);
 	return *this;
 }
 
-void Http::V2::HPack::Encoder::ClearDynamicTable()
+void Encoder::ClearDynamicTable()
 {
 	dynamictable.clear();
 }
@@ -375,28 +375,28 @@ std::vector<uint8_t> Encoder::Huffman(const std::string & string)
 	return hstring;
 }
 
-Http::V2::HPack::Decoder::Decoder()
+Decoder::Decoder()
 {
 
 }
 
-Http::V2::HPack::Decoder::Decoder(Http::V2::HPack::Decoder && decoder)
-{
-	this->dynamictable = std::move(decoder.dynamictable);
-}
-
-Http::V2::HPack::Decoder::Decoder(const Http::V2::HPack::Decoder & decoder)
+Decoder::Decoder(Decoder && decoder)
 {
 	this->dynamictable = std::move(decoder.dynamictable);
 }
 
-Http::V2::HPack::Decoder &Http::V2::HPack::Decoder::operator =(const Http::V2::HPack::Decoder & decoder)
+Decoder::Decoder(const Decoder & decoder)
+{
+	this->dynamictable = std::move(decoder.dynamictable);
+}
+
+Decoder &Decoder::operator =(const Decoder & decoder)
 {
 	this->dynamictable = std::move(decoder.dynamictable);
 	return *this;
 }
 
-void Http::V2::HPack::Decoder::ClearDynamicTable()
+void Decoder::ClearDynamicTable()
 {
 	dynamictable.clear();
 }

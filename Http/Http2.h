@@ -147,8 +147,8 @@ namespace Http
 			Connection& operator=(const Connection & con);
 		};
 
-		bool FindFile(std::experimental::filesystem::path & filepath, std::string & uri);
-		bool ReadUntil(SSL *ssl, uint8_t * buffer, int length);
+		//bool FindFile(std::experimental::filesystem::path & filepath, std::string & uri);
+		
 		template<class Iterator>
 		Frame ReadFrame(Iterator iterator)
 		{
