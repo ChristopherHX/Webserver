@@ -4,7 +4,7 @@
 
 namespace Net
 {
-	class TLSSocket : Socket
+	class TLSSocket : public Socket
 	{
 	private:
 		SSL * ssl;

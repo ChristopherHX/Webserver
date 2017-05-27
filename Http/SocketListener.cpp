@@ -5,9 +5,15 @@ using namespace Net;
 
 void SocketListener::OnConnection(std::shared_ptr<Socket> socket)
 {
-	if (_onconnection)
+	if (!_onconnection)
+		throw std::runtime_error("You have to set an Connectionhandler");
+	if (clients > 10)
+		throw std::runtime_error("Too many Connections");
+	clients++;
+	std::thread([this, socket]() {
 		_onconnection(socket);
-	throw std::runtime_error("You have to set an Connectionhandler");
+		clients--;
+	});
 }
 
 SocketListener::SocketListener()
@@ -60,6 +66,18 @@ void SocketListener::Listen(IN6_ADDR address, int port)
 	{
 		throw std::runtime_error(u8"Can't listen Socket");
 	}
+	listening = std::thread([this]() {
+		while (true)
+		{
+			auto socket = Accept();
+			OnConnection(socket);
+		}
+	});
+}
+
+std::shared_ptr<Socket> SocketListener::Accept()
+{
+	return std::make_shared<Socket>(Socket(accept(socket, nullptr, nullptr)));
 }
 
 void SocketListener::SetConnectionHandler(std::function<void(std::shared_ptr<Socket>)> onconnection)

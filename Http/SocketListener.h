@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <memory>
 #include <functional>
+#include <thread>
 
 namespace Net
 {
@@ -11,6 +12,9 @@ namespace Net
 	private:
 		void OnConnection(std::shared_ptr<Socket> socket);
 		std::function<void(std::shared_ptr<Socket>)> _onconnection;
+		virtual std::shared_ptr<Socket> Accept();
+		std::thread listening;
+		int clients;
 	protected:
 		intptr_t socket;
 	public:
