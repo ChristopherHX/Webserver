@@ -2,7 +2,7 @@
 
 using namespace Net;
 
-TLSSocket::TLSSocket(SSL_CTX * sslctx, intptr_t socket) : Socket(socket)
+TLSSocket::TLSSocket(SSL_CTX * sslctx, intptr_t socket, const in6_addr &address, int port) : Socket(socket, address, port)
 {
 	ssl = SSL_new(sslctx);
 	SSL_set_fd(ssl, socket);

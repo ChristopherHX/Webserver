@@ -12,10 +12,14 @@ namespace Net
 	{
 	protected:
 		intptr_t socket;
+		in6_addr address;
+		int port;
 	public:
-		Socket(intptr_t socket);
+		Socket(intptr_t socket, const in6_addr &address, int port);
 		virtual ~Socket();
 		intptr_t GetSocket();
+		const IN6_ADDR &GetAddress();
+		int GetPort();
 		virtual int Receive(uint8_t * buffer, int length);
 		void ReceiveAll(uint8_t * buffer, int length);
 		virtual int Send(uint8_t * buffer, int length);

@@ -76,8 +76,10 @@ void SocketListener::Listen(IN6_ADDR address, int port)
 
 std::shared_ptr<Socket> SocketListener::Accept()
 {
-	intptr_t res = accept(socket, nullptr, nullptr);
-	return std::make_shared<Socket>(res);
+	sockaddr_in6 addresse;
+	socklen_t size = sizeof(addresse);
+	int socket = accept(this->socket, (sockaddr*)&addresse, &size);
+	return std::make_shared<Socket>(socket, addresse.sin6_addr, ntohs(addresse.sin6_port));
 }
 
 void SocketListener::SetConnectionHandler(std::function<void(std::shared_ptr<Socket>)> onconnection)

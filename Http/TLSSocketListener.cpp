@@ -47,5 +47,8 @@ void TLSSocketListener::Listen(IN6_ADDR address, int port)
 
 std::shared_ptr<Socket> TLSSocketListener::Accept()
 {
-	return std::make_shared<TLSSocket>(sslctx, accept(socket, nullptr, nullptr));
+	sockaddr_in6 addresse;
+	socklen_t size = sizeof(addresse);
+	int socket = accept(this->socket, (sockaddr*)&addresse, &size);
+	return std::make_shared<TLSSocket>(sslctx, socket, addresse.sin6_addr, ntohs(addresse.sin6_port));
 }

@@ -3,9 +3,11 @@
 
 using namespace Net;
 
-Socket::Socket(intptr_t socket)
+Socket::Socket(intptr_t socket, const in6_addr &address, int port)
 {
 	this->socket = socket;
+	this->address = address;
+	this->port = port;
 }
 
 Socket::~Socket()
@@ -21,6 +23,11 @@ Socket::~Socket()
 intptr_t Socket::GetSocket()
 {
 	return socket;
+}
+
+const IN6_ADDR & Socket::GetAddress()
+{
+	return address;
 }
 
 int Socket::Receive(uint8_t * buffer, int length)
