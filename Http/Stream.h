@@ -1,4 +1,5 @@
 #pragma once
+#include "Request.h"
 #include <cstdint>
 #include <vector>
 
@@ -24,5 +25,6 @@ public:
 	};
 	State state;
 	Priority priority;
-	std::vector<std::pair<std::string, std::string>> headerlist;
+	std::shared_ptr<Request> request;
+	//std::vector<std::pair<std::string, std::string>> headerlist;
 };

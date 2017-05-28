@@ -191,10 +191,6 @@ std::string Parameter::toString()
 	return ss.str();
 }
 
-Request::Request()
-{
-}
-
 Request::Request(std::string headerstr) : Parameter(headerstr.substr(headerstr.find("\r\n") + 2))
 {
 	std::istringstream iss(headerstr);

@@ -1,6 +1,6 @@
 #pragma once
 #include "utility.h"
-#include "Array.h"
+//#include "Array.h"
 #include <cstdint>
 #include <vector>
 #include <string>
