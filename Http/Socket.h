@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <array>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -28,5 +29,9 @@ namespace Net
 		void ReceiveAll(uint8_t * buffer, int length);
 		virtual int Send(uint8_t * buffer, int length);
 		void SendAll(uint8_t * buffer, int length);
+		template<int l>
+		void SendAll(std::array<uint8_t, l> buffer) {
+			return SendAll(buffer.data(), l);
+		}
 	};
 }

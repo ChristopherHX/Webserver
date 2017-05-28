@@ -3,7 +3,7 @@
 
 using namespace Http::V2::HPack;
 
-std::pair<uint32_t, uint8_t> StaticHuffmanTable[] = {
+std::pair<uint32_t, uint8_t> Http::V2::HPack::StaticHuffmanTable[] = {
 { 0x1ff8, 13},
 { 0x7fffd8, 23 },
 { 0xfffffe2, 28 },
@@ -263,7 +263,7 @@ std::pair<uint32_t, uint8_t> StaticHuffmanTable[] = {
 { 0xfffffff, 30 }
 };
 
-std::pair<std::string, std::string> StaticTable[] = {
+std::pair<std::string, std::string> Http::V2::HPack::StaticTable[] = {
 	{ ":authority", "" },
 	{ ":method","GET" },
 	{ ":method","POST" },
