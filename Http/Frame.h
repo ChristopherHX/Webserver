@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <array>
 
+uint32_t GetUInt31(const uint8_t* source);
+
 enum class FrameFlag : uint8_t
 {
 	END_STREAM = 0x1,

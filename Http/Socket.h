@@ -6,6 +6,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <WS2tcpip.h>
+#undef max
+#undef min
+#undef NO_ERROR
 #endif
 
 namespace Net

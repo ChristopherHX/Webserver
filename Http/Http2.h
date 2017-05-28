@@ -36,7 +36,7 @@ namespace Http
 			class Decoder;
 		}
 		struct RequestContext;
-		extern std::pair<std::experimental::filesystem::path, std::string> MimeTypeTable[];
+		//extern std::pair<std::experimental::filesystem::path, std::string> MimeTypeTable[];
 
 		struct Frame
 		{
@@ -86,16 +86,6 @@ namespace Http
 		};
 
 		extern std::string ErrorCodes[];
-
-		enum class Settings : uint16_t
-		{
-			HEADER_TABLE_SIZE = 0x0,
-			ENABLE_PUSH = 0x1,
-			MAX_CONCURRENT_STREAMS = 0x2,
-			INITIAL_WINDOW_SIZE = 0x3,
-			MAX_FRAME_SIZE = 0x4,
-			MAX_HEADER_LIST_SIZE = 0x5
-		};
 
 		class Stream
 		{
