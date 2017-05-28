@@ -30,7 +30,7 @@ void TLSSocketListener::SetPublicChainfile(const path & publiccertificate)
 	this->publiccertificate = publiccertificate;
 }
 
-void TLSSocketListener::Listen(IN6_ADDR address, int port)
+std::shared_ptr<std::thread> & TLSSocketListener::Listen(IN6_ADDR address, int port)
 {
 	if (privatekey.empty())
 		throw std::runtime_error("Use SetPrivateKey to select a Private key file");
@@ -42,7 +42,7 @@ void TLSSocketListener::Listen(IN6_ADDR address, int port)
 	{
 		return SSL_select_next_proto((unsigned char **)out, outlen, (const unsigned char *)"\x2h2\bhttp/1.1", 12, in, inlen) == OPENSSL_NPN_NEGOTIATED ? 0 : 1;
 	}, nullptr);
-	SocketListener::Listen(address, port);
+	return SocketListener::Listen(address, port);
 }
 
 std::shared_ptr<Socket> TLSSocketListener::Accept()

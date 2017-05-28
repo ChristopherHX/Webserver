@@ -30,10 +30,16 @@ SocketListener::SocketListener()
 		setsockopt(socket, IPPROTO_TCP, TCP_FASTOPEN, (const char*)&value, sizeof(value));
 		setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&value, sizeof(value));
 	}
+	clients = 0;
 }
 
 SocketListener::~SocketListener()
 {
+	Cancel();
+	if (listener->joinable())
+	{
+		listener->join();
+	}
 	if (socket != -1)
 	{
 		shutdown(socket, 2);
@@ -45,7 +51,7 @@ SocketListener::~SocketListener()
 #endif // _WIN32
 }
 
-void SocketListener::Listen(IN6_ADDR address, int port)
+std::shared_ptr<std::thread> & SocketListener::Listen(IN6_ADDR address, int port)
 {
 	if (socket == -1)
 		throw std::runtime_error("Invalid Socket");
@@ -65,13 +71,25 @@ void SocketListener::Listen(IN6_ADDR address, int port)
 	{
 		throw std::runtime_error(u8"Can't listen Socket");
 	}
-	//listening = std::thread([this]() {
-		while (true)
+	cancel = false;
+	return listener = std::make_shared<std::thread>([this]() {
+		while (!cancel)
 		{
-			auto socket = Accept();
-			OnConnection(socket);
+			try {
+				auto socket = Accept();
+				OnConnection(socket);
+			}
+			catch (const std::runtime_error &error)
+			{
+
+			}
 		}
-	//});
+	});
+}
+
+void SocketListener::Cancel()
+{
+	cancel = true;
 }
 
 std::shared_ptr<Socket> SocketListener::Accept()
