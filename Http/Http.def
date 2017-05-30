@@ -1,6 +1,32 @@
-LIBRARY   Http
+LIBRARY Http.dll
 EXPORTS
-??0Server@Http@@QAA@ABVpath@v1@filesystem@experimental@std@@00@Z
-??0Server@Http2@@QAA@ABVpath@v1@filesystem@experimental@std@@00@Z
-??1Server@Http@@QAA@XZ
-??1Server@Http2@@QAA@XZ
+?SetConnectionHandler@SocketListener@Net@@QEAAXV?$function@$$A6AXV?$shared_ptr@VSocket@Net@@@std@@@Z@std@@@Z
+??0TLSSocketListener@Net@@QEAA@XZ
+??1TLSSocketListener@Net@@UEAA@XZ
+?SetPrivateKey@TLSSocketListener@Net@@QEAAXAEBVpath@v1@filesystem@experimental@std@@@Z
+?SetPublicChainfile@TLSSocketListener@Net@@QEAAXAEBVpath@v1@filesystem@experimental@std@@@Z
+
+??0SocketListener@Net@@QEAA@XZ
+??1SocketListener@Net@@UEAA@XZ
+
+?GetProtocol@Socket@Net@@QEAA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+
+?ReceiveAll@Socket@Net@@QEAAXPEAEH@Z
+
+?SendAll@Socket@Net@@QEAAXPEAEH@Z
+
+?HasFlag@Frame@@QEAA_NW4FrameFlag@@@Z
+
+?Parse@Frame@@SA?AU1@PEBE@Z
+?ToArray@Frame@@QEAA?AV?$array@E$08@std@@XZ
+
+?Listen@TLSSocketListener@Net@@UEAAAEAV?$shared_ptr@Vthread@std@@@std@@Uin6_addr@@H@Z
+?Listen@SocketListener@Net@@UEAAAEAV?$shared_ptr@Vthread@std@@@std@@Uin6_addr@@H@Z
+
+?GetUInt31@@YAIPEBE@Z
+
+?ParseHttp1@Request@@SA?AV1@AEBV?$shared_ptr@VSocket@Net@@@std@@PEAEH@Z
+?ParseHttp2@Request@@SA?AV1@AEBV?$shared_ptr@UFrame@@@std@@AEBV?$shared_ptr@VSocket@Net@@@3@AEAVDecoder@HPack@@PEAEH@Z
+
+?DecodeHeaderblock@Decoder@HPack@@QEAAPEAEPEAE0AEAV?$vector@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@V?$allocator@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@@2@@std@@@Z
+?AppendHeaderBlock@Encoder@HPack@@QEAAXAEAV?$vector@EV?$allocator@E@std@@@std@@AEBV?$vector@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@V?$allocator@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@@2@@4@@Z

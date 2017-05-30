@@ -1,4 +1,5 @@
 #include "Request.h"
+#include "utility.h"
 #include <sstream>
 
 Request::Request()
@@ -38,12 +39,12 @@ Request Request::ParseHttp1(const std::shared_ptr<Net::Socket> & socket, uint8_t
 	return request;
 }
 
-Request Request::ParseHttp2(const std::shared_ptr<Frame> &frame, const std::shared_ptr<Net::Socket>& socket, Http::V2::HPack::Decoder & decoder, uint8_t * buffer, int length)
+Request Request::ParseHttp2(const std::shared_ptr<Frame> &frame, const std::shared_ptr<Net::Socket>& socket, HPack::Decoder & decoder, uint8_t * buffer, int length)
 {
 	Request request;
 	request.frame = frame;
 	request.socket = socket;
-	decoder.Headerblock(buffer, buffer + length, request.headerlist);
+	decoder.DecodeHeaderblock(buffer, buffer + length, request.headerlist);
 	for (auto & entry : request.headerlist)
 	{
 		if (entry.first == ":method")
