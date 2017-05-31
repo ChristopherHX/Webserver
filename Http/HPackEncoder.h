@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <deque>
 #include <string>
 
 namespace HPack
@@ -7,7 +8,7 @@ namespace HPack
 	class Encoder
 	{
 	private:
-		std::vector<std::pair<std::string, std::string>> dynamictable;
+		std::deque<std::pair<std::string, std::string>> dynamictable;
 	public:
 		void AppendHeaderBlock(std::vector<uint8_t> &buffer, const std::vector<std::pair<std::string, std::string>>& headerlist);
 

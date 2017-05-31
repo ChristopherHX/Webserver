@@ -7,7 +7,7 @@ Request::Request()
 
 }
 
-Request Request::ParseHttp1(const std::shared_ptr<Net::Socket> & socket, uint8_t * buffer, int length)
+Request Request::ParseHttp1(uint8_t * buffer, int length)
 {
 	Request request;
 	uint8_t * ofl = buffer;
@@ -18,8 +18,6 @@ Request Request::ParseHttp1(const std::shared_ptr<Net::Socket> & socket, uint8_t
 	std::string path(ofl, ofr);
 	ofl = ofr + 1;
 	ofr = (uint8_t *)memchr(ofl, '\r', length - (ofl - buffer));
-	socket->SetProtocol(std::string(ofl, ofr));
-	request.socket = socket;
 	request.ParseUrl(path);
 	request.headerlist.push_back({ ":method", request.method });
 	request.headerlist.push_back({ ":path", path });
@@ -39,11 +37,9 @@ Request Request::ParseHttp1(const std::shared_ptr<Net::Socket> & socket, uint8_t
 	return request;
 }
 
-Request Request::ParseHttp2(const std::shared_ptr<Frame> &frame, const std::shared_ptr<Net::Socket>& socket, HPack::Decoder & decoder, uint8_t * buffer, int length)
+Request Request::ParseHttp2(HPack::Decoder & decoder, uint8_t * buffer, int length)
 {
 	Request request;
-	request.frame = frame;
-	request.socket = socket;
 	decoder.DecodeHeaderblock(buffer, buffer + length, request.headerlist);
 	for (auto & entry : request.headerlist)
 	{

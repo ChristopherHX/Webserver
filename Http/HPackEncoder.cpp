@@ -5,39 +5,45 @@
 void HPack::Encoder::AppendHeaderBlock(std::vector<uint8_t>& buffer, const std::vector<std::pair<std::string, std::string>>& headerlist)
 {
 	for (auto & entry : headerlist) {
-		auto res = std::find(StaticTable, StaticTable + 61, entry);
-		if (res != (StaticTable + 61))
+		auto pred = [&entry](const std::pair<std::string, std::string> & pair) {
+			return entry.first == pair.first;
+		};
+		auto tentry = std::find_if(StaticTable, StaticTable + 61, pred);
+		if (tentry != (StaticTable + 61))
 		{
-			AppendInteger(buffer, (res - StaticTable) + 1, 0x80, 7);
-		}
-		else
-		{
-			auto res = std::find(dynamictable.begin(), dynamictable.end(), entry);
-			if (res != dynamictable.end())
+			auto eentry = std::find(tentry, StaticTable + 61, entry);
+			if (eentry != (StaticTable + 61))
 			{
-				AppendInteger(buffer, (dynamictable.begin() - res) + 62, 0x80, 7);
+				AppendInteger(buffer, (eentry - StaticTable) + 1, 0x80, 7);
 			}
 			else
 			{
-				auto res = std::find_if(StaticTable, StaticTable + 61, [&key = entry.first](const std::pair<std::string, std::string> & pair){ return pair.first == key; });
-				if (res != (StaticTable + 61))
+				AppendInteger(buffer, (tentry - StaticTable) + 1, 0, 4);
+				AppendString(buffer, entry.second);
+			}
+		}
+		else
+		{
+			auto res = std::find_if(dynamictable.begin(), dynamictable.end(), pred);
+			if (res != dynamictable.end())
+			{
+				auto eentry = std::find(res, dynamictable.end(), entry);
+				if (eentry != dynamictable.end())
 				{
-					AppendInteger(buffer, (res - StaticTable) + 1, 0x40, 6);
+					AppendInteger(buffer, (eentry - dynamictable.begin()) + 1, 0x80, 7);
 				}
 				else
 				{
-					auto res = std::find_if(dynamictable.begin(), dynamictable.end(), [&key = entry.first](const std::pair<std::string, std::string> & pair){ return pair.first == key; });
-					if (res != dynamictable.end())
-					{
-						AppendInteger(buffer, (dynamictable.begin() - res) + 62, 0x40, 6);
-					}
-					else
-					{
-						AppendInteger(buffer, 0, 0x40, 6);
-						AppendString(buffer, entry.first);
-					}
+					AppendInteger(buffer, (res - dynamictable.begin()) + 62, 0, 4);
+					AppendString(buffer, entry.second);
 				}
+			}
+			else
+			{
+				AppendInteger(buffer, 0, 0x40, 6);
+				AppendString(buffer, entry.first);
 				AppendString(buffer, entry.second);
+				dynamictable.push_front(entry);
 			}
 		}
 	}

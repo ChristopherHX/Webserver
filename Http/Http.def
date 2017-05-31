@@ -25,8 +25,12 @@ EXPORTS
 
 ?GetUInt31@@YAIPEBE@Z
 
-?ParseHttp1@Request@@SA?AV1@AEBV?$shared_ptr@VSocket@Net@@@std@@PEAEH@Z
-?ParseHttp2@Request@@SA?AV1@AEBV?$shared_ptr@UFrame@@@std@@AEBV?$shared_ptr@VSocket@Net@@@3@AEAVDecoder@HPack@@PEAEH@Z
-
 ?DecodeHeaderblock@Decoder@HPack@@QEAAPEAEPEAE0AEAV?$vector@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@V?$allocator@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@@2@@std@@@Z
 ?AppendHeaderBlock@Encoder@HPack@@QEAAXAEAV?$vector@EV?$allocator@E@std@@@std@@AEBV?$vector@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@V?$allocator@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@@2@@4@@Z
+
+?ParseHttp1@Request@@SA?AV1@PEAEH@Z
+?ParseHttp2@Request@@SA?AV1@AEAVDecoder@HPack@@PEAEH@Z
+?SendResponse@Http1Connection@@UEAAXXZ
+?SendData@Http1Connection@@UEAAXPEAEH_N@Z
+?SendResponse@Http2Connection@@UEAAXXZ
+?SendData@Http2Connection@@UEAAXPEAEH_N@Z
