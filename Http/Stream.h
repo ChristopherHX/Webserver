@@ -2,29 +2,40 @@
 #include "Request.h"
 #include <cstdint>
 #include <vector>
+#include <functional>
+
+class StreamPriority
+{
+public:
+	StreamPriority();
+	bool exclusive;
+	uint32_t dependency;
+	uint8_t weight;
+};
+
+enum class StreamState : uint8_t
+{
+	idle,
+	reserved_local,
+	reserved_remote,
+	open,
+	half_closed_local,
+	half_closed_remote,
+	closed
+};
 
 class Stream
 {
+private:
+	std::function<void(const uint8_t * buffer, uint32_t length)> _ondata;
+	std::function<void(Frame & frame, const uint8_t * buffer, uint32_t length)> _oncontinuation;
 public:
-	enum class State : uint8_t
-	{
-		idle = 0b0,
-		reserved_local = 0b00000100,
-		reserved_remote = 0b00001000,
-		open = 0b00000011,
-		half_closed_local = 0b00000001,
-		half_closed_remote = 0b00000010,
-		closed = 0b11110000
-	};
-	class Priority
-	{
-	public:
-		bool exclusive;
-		uint32_t dependency;
-		uint8_t weight;
-	};
-	State state;
-	Priority priority;
-	std::shared_ptr<Request> request;
-	//std::vector<std::pair<std::string, std::string>> headerlist;
+	Stream(uint32_t identifier);
+	uint32_t identifier;
+	StreamState state;
+	StreamPriority priority;
+	void OnData(const uint8_t * buffer, uint32_t length);
+	void SetOnData(std::function<void(const uint8_t * buffer, uint32_t length)> ondata);
+	void OnContinuation(Frame & frame, const uint8_t * buffer, uint32_t length);
+	void SetOnContinuation(std::function<void(Frame & frame, const uint8_t * buffer, uint32_t length)> ondata);
 };

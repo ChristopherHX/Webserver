@@ -25,12 +25,19 @@ EXPORTS
 
 ?GetUInt31@@YAIPEBE@Z
 
-?DecodeHeaderblock@Decoder@HPack@@QEAAPEAEPEAE0AEAV?$vector@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@V?$allocator@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@@2@@std@@@Z
 ?AppendHeaderBlock@Encoder@HPack@@QEAAXAEAV?$vector@EV?$allocator@E@std@@@std@@AEBV?$vector@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@V?$allocator@U?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@@2@@4@@Z
 
-?ParseHttp1@Request@@SA?AV1@PEAEH@Z
-?ParseHttp2@Request@@SA?AV1@AEAVDecoder@HPack@@PEAEH@Z
-?SendResponse@Http1Connection@@UEAAXXZ
+?SendResponse@Http1Connection@@UEAAX_N@Z
+?OnData@Http1Connection@@QEAAXPEBEI@Z
+?SetOnData@Http1Connection@@UEAAXV?$function@$$A6AXPEBEI@Z@std@@@Z
 ?SendData@Http1Connection@@UEAAXPEAEH_N@Z
-?SendResponse@Http2Connection@@UEAAXXZ
+?SendResponse@Http2Connection@@UEAAX_N@Z
+?SetOnData@Http2Connection@@UEAAXV?$function@$$A6AXPEBEI@Z@std@@@Z
 ?SendData@Http2Connection@@UEAAXPEAEH_N@Z
+
+?ParseHttp1@Request@@SA?AV1@PEBEH@Z
+?AppendHttp2@Request@@QEAAXAEAVDecoder@HPack@@PEBEH@Z
+?OnData@Stream@@QEAAXPEBEI@Z
+?OnContinuation@Stream@@QEAAXAEAUFrame@@PEBEI@Z
+?SetOnContinuation@Stream@@QEAAXV?$function@$$A6AXAEAUFrame@@PEBEI@Z@std@@@Z
+??0Stream@@QEAA@I@Z

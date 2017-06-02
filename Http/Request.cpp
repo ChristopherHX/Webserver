@@ -2,30 +2,25 @@
 #include "utility.h"
 #include <sstream>
 
-Request::Request()
-{
-
-}
-
-Request Request::ParseHttp1(uint8_t * buffer, int length)
+Request Request::ParseHttp1(const uint8_t * buffer, int length)
 {
 	Request request;
-	uint8_t * ofl = buffer;
-	uint8_t * ofr = (uint8_t *)memchr(ofl, ' ', length - (ofl - buffer));
+	const uint8_t * ofl = buffer;
+	const uint8_t * ofr = (const uint8_t *)memchr(ofl, ' ', length - (ofl - buffer));
 	request.method = std::string(ofl, ofr);
 	ofl = ofr + 1;
-	ofr = (uint8_t *)memchr(ofl, ' ', length - (ofl - buffer));
+	ofr = (const uint8_t *)memchr(ofl, ' ', length - (ofl - buffer));
 	std::string path(ofl, ofr);
 	ofl = ofr + 1;
-	ofr = (uint8_t *)memchr(ofl, '\r', length - (ofl - buffer));
+	ofr = (const uint8_t *)memchr(ofl, '\r', length - (ofl - buffer));
 	request.ParseUrl(path);
 	request.headerlist.push_back({ ":method", request.method });
 	request.headerlist.push_back({ ":path", path });
 	while (ofr + 2 < buffer + length)
 	{
 		ofl = ofr + 2;
-		ofr = (uint8_t *)memchr(ofl, '\r', length - (ofl - buffer));
-		uint8_t * sep = (uint8_t *)memchr(ofl, ':', length - (ofl - buffer));
+		ofr = (const uint8_t *)memchr(ofl, '\r', length - (ofl - buffer));
+		const uint8_t * sep = (const uint8_t *)memchr(ofl, ':', length - (ofl - buffer));
 		if (sep != nullptr && sep < ofr)
 		{
 			std::string key(ofl, sep);
@@ -34,22 +29,11 @@ Request Request::ParseHttp1(uint8_t * buffer, int length)
 				request.headerlist.push_back({ key, std::string(sep + 2, ofr) });
 		}
 	}
-	return request;
-}
-
-Request Request::ParseHttp2(HPack::Decoder & decoder, uint8_t * buffer, int length)
-{
-	Request request;
-	decoder.DecodeHeaderblock(buffer, buffer + length, request.headerlist);
 	for (auto & entry : request.headerlist)
 	{
-		if (entry.first == ":method")
+		if (entry.first == "content-length")
 		{
-			request.method = entry.second;
-		}
-		else if (entry.first == ":path")
-		{
-			request.ParseUrl(entry.second);
+			request.length = std::stoll(entry.second);
 		}
 	}
 	return request;
@@ -68,5 +52,25 @@ void Request::ParseUrl(const std::string & path)
 	else
 	{
 		this->path = Utility::urlDecode(path);
+	}
+}
+
+void Request::AppendHttp2(HPack::Decoder & decoder, const uint8_t * buffer, int length)
+{
+	decoder.DecodeHeaderblock(buffer, buffer + length, headerlist);
+	for (auto & entry : headerlist)
+	{
+		if (entry.first == ":method")
+		{
+			method = entry.second;
+		}
+		else if (entry.first == ":path")
+		{
+			ParseUrl(entry.second);
+		}
+		else if (entry.first == "content-length")
+		{
+			this->length = std::stoll(entry.second);
+		}
 	}
 }

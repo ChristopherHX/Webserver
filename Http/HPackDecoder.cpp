@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <sstream>
 
-uint8_t * HPack::Decoder::DecodeHeaderblock(uint8_t * pos, uint8_t * end, std::vector<std::pair<std::string, std::string>>& headerlist)
+const uint8_t * HPack::Decoder::DecodeHeaderblock(const uint8_t * pos, const uint8_t * end, std::vector<std::pair<std::string, std::string>>& headerlist)
 {
 	while (pos != end)
 	{
@@ -116,7 +116,7 @@ uint8_t * HPack::Decoder::DecodeHeaderblock(uint8_t * pos, uint8_t * end, std::v
 	return pos;
 }
 
-uint8_t * HPack::Decoder::DecodeInteger(uint8_t * pos, uint64_t & integer, uint8_t bits)
+const uint8_t * HPack::Decoder::DecodeInteger(const uint8_t * pos, uint64_t & integer, uint8_t bits)
 {
 	uint8_t mask = (1 << bits) - 1;
 	if ((integer = *pos & mask) == mask)
@@ -131,7 +131,7 @@ uint8_t * HPack::Decoder::DecodeInteger(uint8_t * pos, uint64_t & integer, uint8
 	return ++pos;
 }
 
-uint8_t * HPack::Decoder::DecodeHuffmanString(uint8_t * pos, std::string & string, long long length)
+const uint8_t * HPack::Decoder::DecodeHuffmanString(const uint8_t * pos, std::string & string, long long length)
 {
 	std::ostringstream strs;
 	long long  i = 0, blength = length << 3;
@@ -156,7 +156,7 @@ uint8_t * HPack::Decoder::DecodeHuffmanString(uint8_t * pos, std::string & strin
 	}
 }
 
-uint8_t * HPack::Decoder::DecodeString(uint8_t * pos, std::string & string)
+const uint8_t * HPack::Decoder::DecodeString(const uint8_t * pos, std::string & string)
 {
 	uint64_t length;
 	bool huffmanencoding = (*pos & 0x80) == 0x80;
