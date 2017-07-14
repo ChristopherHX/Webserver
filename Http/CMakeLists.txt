@@ -1,8 +1,0 @@
-add_library(Http SHARED HttpServer.cpp HttpRequestBuffer.cpp Http.cpp Http2.cpp hpack.cpp utility.cpp)
-if(WIN32)
-target_link_libraries (Http libssl libcrypto)
-elseif(UNIX)
-target_link_libraries (Http stdc++ stdc++fs pthread dl ssl crypto)
-endif()
-install (TARGETS Http DESTINATION bin)
-install (FILES HttpServer.h HttpRequestBuffer.h Http.h Http2.h hpack.h Array.h utility.h DESTINATION include)
