@@ -8,7 +8,7 @@ namespace Net
 	{
 		namespace V2
 		{
-			class Http2Connection : public Connection
+			class Connection : public Net::Http::Connection
 			{
 			public:
 				std::shared_ptr<HPack::Encoder> encoder;

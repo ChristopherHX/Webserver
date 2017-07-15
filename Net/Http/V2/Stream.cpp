@@ -1,4 +1,5 @@
 #include "Stream.h"
+#include "Frame.h"
 
 using namespace Net::Http::V2;
 

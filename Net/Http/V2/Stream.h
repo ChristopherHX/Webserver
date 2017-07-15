@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Request.h"
+#include "Frame.h"
 #include <cstdint>
 #include <vector>
 #include <functional>

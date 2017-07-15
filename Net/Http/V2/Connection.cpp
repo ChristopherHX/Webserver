@@ -1,8 +1,9 @@
 #include "Connection.h"
+#include "Frame.h"
 
 using namespace Net::Http::V2;
 
-void Http2Connection::SendResponse(bool endstream)
+void Connection::SendResponse(bool endstream)
 {
 	auto body = response.ToHttp2(*encoder);
 	Frame result;
@@ -14,7 +15,7 @@ void Http2Connection::SendResponse(bool endstream)
 	socket->SendAll(body.data(), body.size());
 }
 
-void Http2Connection::SendData(uint8_t * buffer, int length, bool endstream)
+void Connection::SendData(uint8_t * buffer, int length, bool endstream)
 {
 	Frame result;
 	result.length = length;
@@ -25,7 +26,7 @@ void Http2Connection::SendData(uint8_t * buffer, int length, bool endstream)
 	socket->SendAll(buffer, length);
 }
 
-void Http2Connection::SetOnData(std::function<void(const uint8_t*buffer, uint32_t length)> ondata)
+void Connection::SetOnData(std::function<void(const uint8_t*buffer, uint32_t length)> ondata)
 {
 	stream->SetOnData(ondata);
 }

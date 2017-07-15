@@ -43,7 +43,7 @@ std::string Response::ToHttp1()
 	return result.str();
 }
 
-std::vector<uint8_t> Response::ToHttp2(HPack::Encoder & encoder)
+std::vector<uint8_t> Response::ToHttp2(Net::Http::V2::HPack::Encoder & encoder)
 {
 	std::vector<uint8_t> result;
 	encoder.AppendHeaderBlock(result, { { ":status", std::to_string(status) } });

@@ -4,17 +4,16 @@
 
 using namespace Net;
 
-void SocketListener::OnConnection(std::shared_ptr<Socket> socket)
+bool SocketListener::OnConnection(std::shared_ptr<Socket> socket)
 {
-	if (!_onconnection)
-		throw std::runtime_error("You have to set an Connectionhandler");
-	if (clients > 10)
-		throw std::runtime_error("Too many Connections");
+	if (!_onconnection || clients > 10)
+		return false;
 	clients++;
 	std::thread([this, socket]() {
 		_onconnection(socket);
 		clients--;
 	}).detach();
+	return true;
 }
 
 SocketListener::SocketListener()
@@ -28,7 +27,7 @@ SocketListener::SocketListener()
 		uint32_t value = 0;
 		setsockopt(socket, IPPROTO_IPV6, IPV6_V6ONLY, (const char*)&value, sizeof(value));
 		value = 1;
-		//setsockopt(socket, IPPROTO_TCP, TCP_FASTOPEN, (const char*)&value, sizeof(value));
+		setsockopt(socket, IPPROTO_TCP, TCP_FASTOPEN, (const char*)&value, sizeof(value));
 		setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&value, sizeof(value));
 	}
 	clients = 0;
@@ -55,7 +54,7 @@ SocketListener::~SocketListener()
 std::shared_ptr<std::thread> & SocketListener::Listen(in6_addr address, int port)
 {
 	if (socket == -1)
-		throw std::runtime_error("Invalid Socket");
+		return std::shared_ptr<std::thread>();
 	{
 		sockaddr_in6 saddress;
 		memset(&saddress, 0, sizeof(sockaddr_in6));
@@ -63,31 +62,17 @@ std::shared_ptr<std::thread> & SocketListener::Listen(in6_addr address, int port
 		saddress.sin6_addr = address;
 		saddress.sin6_port = htons(port);
 		if (::bind(socket, (sockaddr *)&saddress, sizeof(saddress)) == -1)
-		{
-#ifdef _WIN32
-			int error = WSAGetLastError();
-#else
-			//throw std::runtime_error("Can't bind Socket: " /*+ std::to_string(errno)*/);
-#endif
-			throw std::runtime_error(u8"Can't bind Socket");
-		}
+			return std::shared_ptr<std::thread>();
 	}
 	if (listen(socket, 10) == -1)
-	{
-		throw std::runtime_error(u8"Can't listen Socket");
-	}
+		return std::shared_ptr<std::thread>();
 	cancel = false;
 	return listener = std::make_shared<std::thread>([this]() {
 		while (!cancel)
 		{
-			try {
-				auto socket = Accept();
+			auto socket = Accept();
+			if(socket)
 				OnConnection(socket);
-			}
-			catch (const std::runtime_error &error)
-			{
-
-			}
 		}
 	});
 }
@@ -103,7 +88,7 @@ std::shared_ptr<Socket> SocketListener::Accept()
 	socklen_t size = sizeof(addresse);
 	int socket = accept(this->socket, (sockaddr*)&addresse, &size);
 	if (socket == -1)
-		throw std::runtime_error("Accept failed");
+		return std::shared_ptr<Socket>();
 	return std::make_shared<Socket>(socket, addresse.sin6_addr, ntohs(addresse.sin6_port));
 }
 

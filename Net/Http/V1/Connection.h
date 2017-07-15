@@ -7,7 +7,7 @@ namespace Net
 	{
         namespace V1
         {
-            class Http1Connection : public Connection
+            class Connection : public Net::Http::Connection
             {
             private:
                 std::function<void(const uint8_t*buffer, uint32_t length)> _ondata;

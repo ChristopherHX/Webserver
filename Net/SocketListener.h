@@ -10,7 +10,7 @@ namespace Net
 	class SocketListener
 	{
 	private:
-		void OnConnection(std::shared_ptr<Socket> socket);
+		bool OnConnection(std::shared_ptr<Socket> socket);
 		std::function<void(std::shared_ptr<Socket>)> _onconnection;
 		virtual std::shared_ptr<Socket> Accept();
 		std::shared_ptr<std::thread> listener;

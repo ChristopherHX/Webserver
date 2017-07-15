@@ -1,7 +1,9 @@
 #include "Request.h"
-#include "utility.h"
+#include "../../utility.h"
 #include <sstream>
 #include <algorithm>
+
+using namespace Net::Http;
 
 Request Request::ParseHttp1(const uint8_t * buffer, int length)
 {
@@ -56,7 +58,7 @@ void Request::ParseUrl(const std::string & path)
 	}
 }
 
-void Request::AppendHttp2(HPack::Decoder & decoder, const uint8_t * buffer, int length)
+void Request::AppendHttp2(Net::Http::V2::HPack::Decoder & decoder, const uint8_t * buffer, int length)
 {
 	decoder.DecodeHeaderblock(buffer, buffer + length, headerlist);
 	for (auto & entry : headerlist)
