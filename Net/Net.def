@@ -1,1 +1,23 @@
 LIBRARY Net.dll
+EXPORTS
+?GetProtocol@Socket@Net@@QAA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
+?ReceiveAll@Socket@Net@@QAAXPAEH@Z
+?SendAll@Socket@Net@@QAAXPAEH@Z
+?SendAll@Socket@Net@@QAAXV?$vector@EV?$allocator@E@std@@@std@@@Z
+?SetConnectionHandler@SocketListener@Net@@QAAXV?$function@$$A6AXV?$shared_ptr@VSocket@Net@@@std@@@Z@std@@@Z
+??1TLSSocketListener@Net@@UAA@XZ
+??0TLSSocketListener@Net@@QAA@XZ
+?Listen@TLSSocketListener@Net@@UAAAAV?$shared_ptr@Vthread@std@@@std@@Uin6_addr@@H@Z
+?GetUInt31@@YAIPBE@Z
+?HasFlag@Frame@V2@Http@Net@@QAA_NW4FrameFlag@234@@Z
+?Parse@Frame@V2@Http@Net@@SA?AU1234@PBE@Z
+?ToArray@Frame@V2@Http@Net@@QAA?AV?$vector@EV?$allocator@E@std@@@std@@XZ
+?ParseHttp1@Request@Http@Net@@SA?AV123@PBEH@Z
+?AppendHttp2@Request@Http@Net@@QAAXAAVDecoder@HPack@V2@23@PBEH@Z
+??0Stream@V2@Http@Net@@QAA@I@Z
+?OnData@Stream@V2@Http@Net@@QAAXPBEI@Z
+?OnContinuation@Stream@V2@Http@Net@@QAAXAAUFrame@234@PBEI@Z
+?SetOnContinuation@Stream@V2@Http@Net@@QAAXV?$function@$$A6AXAAUFrame@V2@Http@Net@@PBEI@Z@std@@@Z
+?SendResponse@Connection@V2@Http@Net@@UAAX_N@Z
+?SendData@Connection@V2@Http@Net@@UAAXPAEH_N@Z
+?SetOnData@Connection@V2@Http@Net@@UAAXV?$function@$$A6AXPBEI@Z@std@@@Z

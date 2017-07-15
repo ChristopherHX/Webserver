@@ -47,41 +47,50 @@ bool TLSSocketListener::UseCertificate(const std::string & certificate, SSLFileT
 
 bool TLSSocketListener::UseCertificate(const uint8_t * buffer, int length, SSLFileType ftype)
 {
-	std::shared_ptr<std::runtime_error> ex;
-	BIO * bio = BIO_new_mem_buf(buffer, length);
-	X509 * key = PEM_read_bio_X509_AUX(bio, nullptr, nullptr, nullptr);
-	bool ret;
-	if (ret = key != nullptr)
+	switch (ftype)
 	{
-		if (ret = SSL_CTX_use_certificate(sslctx, key))
+	case Net::SSLFileType::PEM:
+	{
+		BIO * bio = BIO_new_mem_buf(buffer, length);
+		X509 * key = PEM_read_bio_X509_AUX(bio, nullptr, nullptr, nullptr);
+		bool ret;
+		if (ret = key != nullptr)
 		{
-			if (ret = SSL_CTX_clear_chain_certs(sslctx))
+			if (ret = SSL_CTX_use_certificate(sslctx, key))
 			{
+				if (ret = SSL_CTX_clear_chain_certs(sslctx))
 				{
-					X509 *ca;
-					while ((ca = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr)) != nullptr)
 					{
-						if (SSL_CTX_add0_chain_cert(sslctx, ca))
+						X509 *ca;
+						while ((ca = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr)) != nullptr)
 						{
-							X509_free(ca);
-							ex = std::make_shared<std::runtime_error>(u8"SSL_CTX_add0_chain_cert failed");
-							break;
+							if (SSL_CTX_add0_chain_cert(sslctx, ca))
+							{
+								X509_free(ca);
+								ret = false;
+								break;
+							}
 						}
 					}
-				}
-				{
-					auto err = ERR_peek_last_error();
-					if (ERR_GET_LIB(err) == ERR_LIB_PEM	&& ERR_GET_REASON(err) == PEM_R_NO_START_LINE)
-						ERR_clear_error();
-					else
-						ret = false;
+					{
+						auto err = ERR_peek_last_error();
+						if (ERR_GET_LIB(err) == ERR_LIB_PEM	&& ERR_GET_REASON(err) == PEM_R_NO_START_LINE)
+							ERR_clear_error();
+						else
+							ret = false;
+					}
 				}
 			}
 		}
+		X509_free(key);
+		BIO_free(bio);
+		return ret;
 	}
-	X509_free(key);
-	BIO_free(bio);
-	return ret;
+	case Net::SSLFileType::DER:
+		return false;
+	default:
+		return false;
+	}
 }
 
 std::shared_ptr<std::thread> & TLSSocketListener::Listen(in6_addr address, int port)
