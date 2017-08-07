@@ -121,7 +121,7 @@ namespace Http
 		public:
 			std::mutex rmtx, wmtx;
 			uintptr_t csocket;
-			sockaddr_in6 address;
+			sockaddr_in6 socketaddress;
 			SSL * cssl;
 			std::vector<Stream> streams;
 			std::shared_mutex streamlock;
@@ -130,7 +130,7 @@ namespace Http
 			uint32_t settings[6];
 
 			Connection();
-			Connection(uintptr_t csocket, const sockaddr_in6 &address);
+			Connection(uintptr_t csocket, const sockaddr_in6 &socketaddress);
 			Connection(Connection && con);
 			Connection(const Connection & con);
 			~Connection();

@@ -49,12 +49,12 @@ void Request::ParseUrl(const std::string & path)
 	{
 		query = path.substr(sep + 1);
 		std::transform(query.begin(), query.end(), query.begin(), [](char ch) {return ch == '+' ? ' ' : ch; });
-		query = Utility::urlDecode(query);
-		this->path = Utility::urlDecode(path.substr(0, sep));
+		query = Utility::UrlDecode(query);
+		this->path = Utility::UrlDecode(path.substr(0, sep));
 	}
 	else
 	{
-		this->path = Utility::urlDecode(path);
+		this->path = Utility::UrlDecode(path);
 	}
 }
 

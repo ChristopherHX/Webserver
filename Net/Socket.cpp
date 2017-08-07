@@ -3,38 +3,17 @@
 
 using namespace Net;
 
-Socket::Socket(SOCKET socket, const in6_addr &address, int port)
-{
-	this->handle = socket;
-	this->address = address;
-	this->port = port;
-}
-
-Socket::Socket(SOCKET socket, const sockaddr_storage & address)
-{
-
-}
-
-Socket::Socket()
-{
-	
-	//struct in_addr interface_addr;
-	//int s = sizeof(interface_addr);
-	//getsockopt(handle, IPPROTO_IP, IP_MULTICAST_IF, (char*)&interface_addr, &s);
-	//addrinfo addr;
-	//memset(&addr, 0, sizeof(addr));
-	//addr.ai_family = AF_UNSPEC;
-	//addr.ai_socktype = SOCK_DGRAM;
-	//addrinfo * result;
-	
-	//getaddrinfo("127.0.0.1", nullptr, &addr, &result);
-	//freeaddrinfo(result);
-}
-
-Net::Socket::Socket(Socket && socket)
+Socket::Socket(Socket && socket)
 {
 	handle = socket.handle;
+	socketaddress = socket.socketaddress;
 	socket.handle = -1;
+}
+
+Socket::Socket(SOCKET handle, const std::shared_ptr<sockaddr> & socketaddress)
+{
+	this->handle = handle;
+	this->socketaddress = socketaddress;
 }
 
 Socket::~Socket()
@@ -47,29 +26,28 @@ Socket::~Socket()
 	}
 }
 
-Socket Socket::Accept(SOCKET listener)
-{
-	SOCKADDR_STORAGE addresse;
-	socklen_t size = sizeof(addresse);
-	SOCKET socket = accept(listener, (sockaddr*)&addresse, &size);
-	if (socket == -1)
-		throw std::runtime_error("Accept failed");
-	return Socket(socket, addresse);
-}
-
-SOCKET Socket::GetSocket()
+SOCKET Socket::GetHandle()
 {
 	return handle;
 }
 
-const in6_addr & Socket::GetAddress()
+std::string Socket::GetAddress()
 {
-	return address;
+	char buf[255];
+	return std::string(inet_ntop(socketaddress->sa_family, socketaddress.get(), buf, sizeof(buf)));
 }
 
-int Socket::GetPort()
+uint16_t Socket::GetPort()
 {
-	return port;
+	if (socketaddress->sa_family == AF_INET)
+	{
+		return ntohs((*(sockaddr_in*)socketaddress.get()).sin_port);
+	}
+	else if (socketaddress->sa_family == AF_INET6)
+	{
+		return ntohs((*(sockaddr_in6*)socketaddress.get()).sin6_port);
+	}
+	return -1;
 }
 
 void Socket::SetProtocol(const std::string & protocol)
@@ -87,7 +65,7 @@ int Socket::Receive(uint8_t * buffer, int length)
 	return recv(handle, (char*)buffer, length, 0);
 }
 
-void Socket::ReceiveAll(uint8_t * buffer, int length)
+bool Socket::ReceiveAll(uint8_t * buffer, int length)
 {
 	uint8_t * end = buffer + length;
 	while (buffer < end)
@@ -95,10 +73,11 @@ void Socket::ReceiveAll(uint8_t * buffer, int length)
 		int received = Receive(buffer, end - buffer);
 		if (received <= 0)
 		{
-			throw std::runtime_error(u8"Abored because of Socket-Error");
+			return false;
 		}
 		buffer += received;
 	}
+	return true;
 }
 
 int Socket::Send(uint8_t * buffer, int length)
@@ -111,32 +90,22 @@ int Socket::Send(std::vector<uint8_t> buffer)
 	return Send(buffer.data(), buffer.size());
 }
 
-void Socket::SendAll(uint8_t * buffer, int length)
+bool Socket::SendAll(uint8_t * buffer, int length)
 {
-	uint8_t * end = buffer + length;
-	while (buffer < end)
-	{
-		int sent = Send(buffer, end - buffer);
-		if (sent <= 0)
-		{
-			throw std::runtime_error(u8"Abored because of Socket-Error");
-		}
-		buffer += sent;
-	}
+	return Send(buffer, length) == length;
 }
 
-void Socket::SendAll(std::vector<uint8_t> buffer)
+bool Socket::SendAll(std::vector<uint8_t> buffer)
 {
-	SendAll(buffer.data(), buffer.size());
+	return SendAll(buffer.data(), buffer.size());
 }
 
-int Net::Socket::SendTo(uint8_t * buffer, int length, const sockaddr * to, socklen_t tolength)
+int Socket::SendTo(uint8_t * buffer, int length, const sockaddr * to, socklen_t tolength)
 {
 	return sendto(handle, (char*)buffer, length, 0, to, tolength);
 }
 
-int Net::Socket::ReceiveFrom(uint8_t * buffer, int length, sockaddr * from, socklen_t * fromlength)
+int Socket::ReceiveFrom(uint8_t * buffer, int length, sockaddr * from, socklen_t * fromlength)
 {
-	group_req d;
 	return recvfrom(handle, (char*)buffer, length, 0, from, fromlength);
 }

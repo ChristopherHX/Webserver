@@ -22,46 +22,7 @@
 #define closesocket(socket) close(socket)
 #endif
 
-using namespace Http;
-
-std::string String::Replace(const std::string &str, const char * search, const char * replace)
-{
-	std::string res = str;
-	for (int pos = res.find(search); pos < res.length() && pos != std::string::npos; pos = res.find(search, pos))
-	{
-		res = res.replace(pos, strlen(search), replace);
-		pos += strlen(replace);
-	}
-	return res;
-}
-
-void Http::CreateServerSocket(uintptr_t &serverSocket, int port)
-{
-	serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-	if (serverSocket == -1)
-	{
-		throw std::runtime_error(u8"Kann den Socket nicht erstellen");
-	}
-	sockaddr_in serverAdresse;
-	serverAdresse.sin_family = AF_INET;
-	serverAdresse.sin_addr.s_addr = INADDR_ANY;
-	serverAdresse.sin_port = htons(port);
-	if (bind(serverSocket, (sockaddr *)&serverAdresse, sizeof(serverAdresse)) == -1)
-	{
-		throw std::runtime_error(u8"Kann den Socket nicht Binden");
-	}
-	if (listen(serverSocket, 10) == -1)
-	{
-		throw std::runtime_error(u8"Kann den Socket nicht Abhören!\n");
-	}
-}
-
-void Http::CloseSocket(uintptr_t &socket)
-{
-	shutdown(socket, SHUT_RDWR);
-	closesocket(socket);
-	socket = -1;
-}
+using namespace Http::V1;
 
 Values::Values()
 {
@@ -201,18 +162,18 @@ Request::Request(std::string headerstr) : Parameter(headerstr.substr(headerstr.f
 	size_t pq = request.find('?');
 	if (pq != std::string::npos)
 	{
-		putValues = Utility::urlDecode(String::Replace(request.substr(pq + 1), "+", " "));
-		request = Utility::urlDecode(request.substr(0, pq));
+		putValues = Utility::UrlDecode(String::Replace(request.substr(pq + 1), "+", " "));
+		request = Utility::UrlDecode(request.substr(0, pq));
 	}
 	else
 	{
-		request = Utility::urlDecode(request);
+		request = Utility::UrlDecode(request);
 	}
 }
 
 std::string Request::toString()
 {
-	return methode + " " + Utility::urlEncode(request + (putValues.toString() == "" ? "" : ("?" + putValues.toString()))) + " HTTP/1.1\r\n" + Parameter::toString() + "\r\n";
+	return methode + " " + Utility::UrlEncode(request + (putValues.toString() == "" ? "" : ("?" + putValues.toString()))) + " HTTP/1.1\r\n" + Parameter::toString() + "\r\n";
 }
 
 Response::Response()

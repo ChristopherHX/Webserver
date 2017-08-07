@@ -1,13 +1,9 @@
 LIBRARY Net.dll
 EXPORTS
 ?GetProtocol@Socket@Net@@QAA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
-?ReceiveAll@Socket@Net@@QAAXPAEH@Z
-?SendAll@Socket@Net@@QAAXPAEH@Z
-?SendAll@Socket@Net@@QAAXV?$vector@EV?$allocator@E@std@@@std@@@Z
 ?SetConnectionHandler@SocketListener@Net@@QAAXV?$function@$$A6AXV?$shared_ptr@VSocket@Net@@@std@@@Z@std@@@Z
 ??1TLSSocketListener@Net@@UAA@XZ
 ??0TLSSocketListener@Net@@QAA@XZ
-?Listen@TLSSocketListener@Net@@UAAAAV?$shared_ptr@Vthread@std@@@std@@Uin6_addr@@H@Z
 ?GetUInt31@@YAIPBE@Z
 ?HasFlag@Frame@V2@Http@Net@@QAA_NW4FrameFlag@234@@Z
 ?Parse@Frame@V2@Http@Net@@SA?AU1234@PBE@Z
@@ -21,3 +17,19 @@ EXPORTS
 ?SendResponse@Connection@V2@Http@Net@@UAAX_N@Z
 ?SendData@Connection@V2@Http@Net@@UAAXPAEH_N@Z
 ?SetOnData@Connection@V2@Http@Net@@UAAXV?$function@$$A6AXPBEI@Z@std@@@Z
+
+?ReceiveAll@Socket@Net@@QAA_NPAEH@Z
+?SendAll@Socket@Net@@QAA_NPAEH@Z
+?SendAll@Socket@Net@@QAA_NV?$vector@EV?$allocator@E@std@@@std@@@Z
+?UsePrivateKey@TLSSocketListener@Net@@QAA_NABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@W4SSLFileType@2@@Z
+?UseCertificate@TLSSocketListener@Net@@QAA_NABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@W4SSLFileType@2@@Z
+?Listen@TLSSocketListener@Net@@UAAAAV?$shared_ptr@Vthread@std@@@std@@ABV?$shared_ptr@Usockaddr@@@4@H@Z
+?SendResponse@Connection@V1@Http@Net@@UAAX_N@Z
+?SendData@Connection@V1@Http@Net@@UAAXPAEH_N@Z
+?OnData@Connection@V1@Http@Net@@QAAXPBEI@Z
+?SetOnData@Connection@V1@Http@Net@@UAAXV?$function@$$A6AXPBEI@Z@std@@@Z
+?AddProtocol@TLSSocketListener@Net@@QAAXV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
+
+??0SocketListener@Net@@QAA@XZ
+??1SocketListener@Net@@UAA@XZ
+?Listen@SocketListener@Net@@UAAAAV?$shared_ptr@Vthread@std@@@std@@ABV?$shared_ptr@Usockaddr@@@4@H@Z

@@ -12,16 +12,17 @@ namespace Net
 	private:
 		bool OnConnection(std::shared_ptr<Socket> socket);
 		std::function<void(std::shared_ptr<Socket>)> _onconnection;
-		virtual std::shared_ptr<Socket> Accept();
 		std::shared_ptr<std::thread> listener;
 		bool cancel;
 		int clients;
+		std::shared_ptr<sockaddr> address;
 	protected:
-		intptr_t socket;
+		virtual std::shared_ptr<Socket> Accept();
+		SOCKET handle;
 	public:
 		SocketListener();
 		virtual ~SocketListener();
-		virtual std::shared_ptr<std::thread> & Listen(in6_addr address = in6addr_any, int port = 80);
+		virtual std::shared_ptr<std::thread> & Listen(const std::shared_ptr<sockaddr> &address, socklen_t addresslen);
 		void Cancel();
 		void SetConnectionHandler(std::function<void(std::shared_ptr<Socket>)> onconnection);
 	};

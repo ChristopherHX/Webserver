@@ -3,11 +3,23 @@
 
 using namespace Net;
 
-TLSSocket::TLSSocket(SSL_CTX * sslctx, intptr_t socket, const in6_addr &address, int port) : Socket(socket, address, port)
+TLSSocket::TLSSocket(SSL_CTX * sslctx, intptr_t socket, const std::shared_ptr<sockaddr> &socketaddress) : Socket(socket, socketaddress)
 {
 	ssl = SSL_new(sslctx);
 	SSL_set_fd(ssl, socket);
-	SSL_accept(ssl);
+	int ret = SSL_accept(ssl);
+	const unsigned char * alpn;
+	unsigned int len;
+	SSL_get0_alpn_selected(ssl, &alpn, &len);
+	protocol = std::string((const char*)alpn, len);
+}
+
+TLSSocket::TLSSocket(SSL_CTX * sslctx, const std::shared_ptr<Socket> &socket) : Socket(std::move(*socket))
+{
+	ssl = SSL_new(sslctx);
+	SSL_set_fd(ssl, socket->GetHandle());
+	int ret = SSL_accept(ssl);
+	ret = SSL_get_error(ssl, ret);
 	const unsigned char * alpn;
 	unsigned int len;
 	SSL_get0_alpn_selected(ssl, &alpn, &len);

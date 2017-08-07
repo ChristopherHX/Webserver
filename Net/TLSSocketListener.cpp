@@ -1,6 +1,8 @@
 #include "TLSSocketListener.h"
 #include "TLSSocket.h"
 #include <openssl/err.h>
+#include <openssl/tls1.h>
+#include <sstream>
 
 using namespace Net;
 
@@ -8,12 +10,27 @@ TLSSocketListener::TLSSocketListener()
 {
 	OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, nullptr);
 	sslctx = SSL_CTX_new(TLS_server_method());
+
+	/*SSL_CTX_set_tlsext_servername_callback(sslctx, (int(*)(SSL*, int*, void*))[](SSL * ssl, int * tlsex, void * data) -> int {
+		const char *servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+		return SSL_TLSEXT_ERR_OK;
+	});*/
 }
 
 TLSSocketListener::~TLSSocketListener()
 {
 	SSL_CTX_free(sslctx);
 	OPENSSL_cleanup();
+}
+
+void TLSSocketListener::AddProtocol(std::string proto)
+{
+	protocols += (char)proto.length() + proto;
+}
+
+const std::string & TLSSocketListener::GetProtocols()
+{
+	return protocols;
 }
 
 bool TLSSocketListener::UsePrivateKey(const std::string & privatekey, SSLFileType ftype)
@@ -93,23 +110,27 @@ bool TLSSocketListener::UseCertificate(const uint8_t * buffer, int length, SSLFi
 	}
 }
 
-std::shared_ptr<std::thread> & TLSSocketListener::Listen(in6_addr address, int port)
+std::shared_ptr<std::thread> & TLSSocketListener::Listen(const std::shared_ptr<sockaddr> &address, socklen_t addresslen)
 {
 	if (SSL_CTX_check_private_key(sslctx) != 1)
 		return std::shared_ptr<std::thread>();
-	SSL_CTX_set_alpn_select_cb(sslctx, [](SSL * ssl, const unsigned char ** out, unsigned char * outlen, const unsigned char * in, unsigned int inlen, void * args) -> int
 	{
-		return SSL_select_next_proto((unsigned char **)out, outlen, (const unsigned char *)"\x2h2\bhttp/1.1", 12, in, inlen) == OPENSSL_NPN_NEGOTIATED ? 0 : 1;
-	}, nullptr);
-	return SocketListener::Listen(address, port);
+		SSL_CTX_set_alpn_select_cb(sslctx, [](SSL * ssl, const unsigned char ** out, unsigned char * outlen, const unsigned char * in, unsigned int inlen, void * args) -> int
+		{
+			const std::string & protocols = ((TLSSocketListener*)args)->GetProtocols();
+			return SSL_select_next_proto((unsigned char **)out, outlen, (const unsigned char *)protocols.data(), protocols.length(), in, inlen) == OPENSSL_NPN_NEGOTIATED ? 0 : 1;
+		}, (void*)this);
+	}
+	return SocketListener::Listen(address, addresslen);
 }
 
 std::shared_ptr<Socket> TLSSocketListener::Accept()
 {
-	sockaddr_in6 addresse;
-	socklen_t size = sizeof(addresse);
-	intptr_t socket = accept(this->socket, (sockaddr*)&addresse, &size);
+	std::shared_ptr<sockaddr_storage> address = std::make_shared<sockaddr_storage>();
+	socklen_t size = sizeof(sockaddr_storage);
+	SOCKET socket = accept(this->handle, (sockaddr*)address.get(), &size);
 	if (socket == -1)
 		return std::shared_ptr<Socket>();
-	return std::make_shared<TLSSocket>(sslctx, socket, addresse.sin6_addr, ntohs(addresse.sin6_port));
+	return std::make_shared<TLSSocket>(sslctx, socket, std::shared_ptr<sockaddr>(address, (sockaddr*)address.get()));
+	//return std::make_shared<TLSSocket>(sslctx, SocketListener::Accept());
 }

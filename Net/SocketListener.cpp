@@ -4,6 +4,34 @@
 
 using namespace Net;
 
+SocketListener::SocketListener()
+{
+#ifdef _WIN32
+	WSADATA data;
+	WSAStartup(WINSOCK_VERSION, &data);
+#endif // _WIN32
+	handle = -1;
+	clients = 0;
+}
+
+SocketListener::~SocketListener()
+{
+	Cancel();
+	if (listener->joinable())
+	{
+		listener->join();
+	}
+	if (handle != -1)
+	{
+		shutdown(handle, 2);
+		closesocket(handle);
+		handle = -1;
+	}
+#ifdef _WIN32
+	WSACleanup();
+#endif // _WIN32
+}
+
 bool SocketListener::OnConnection(std::shared_ptr<Socket> socket)
 {
 	if (!_onconnection || clients > 10)
@@ -16,62 +44,30 @@ bool SocketListener::OnConnection(std::shared_ptr<Socket> socket)
 	return true;
 }
 
-SocketListener::SocketListener()
+std::shared_ptr<std::thread>& Net::SocketListener::Listen(const std::shared_ptr<sockaddr>& address, socklen_t addresslen)
 {
-#ifdef _WIN32
-	WSADATA data;
-	WSAStartup(WINSOCK_VERSION, &data);
-#endif // _WIN32
-	if((socket = ::socket(AF_INET6, SOCK_STREAM, 0)) != -1)
+	if (handle == -1)
 	{
+		if ((handle = ::socket(address->sa_family, SOCK_STREAM, 0)) == -1)
+			return listener = std::shared_ptr<std::thread>();
 		uint32_t value = 0;
-		setsockopt(socket, IPPROTO_IPV6, IPV6_V6ONLY, (const char*)&value, sizeof(value));
+		setsockopt(handle, IPPROTO_IPV6, IPV6_V6ONLY, (const char*)&value, sizeof(value));
 		value = 1;
-		setsockopt(socket, IPPROTO_TCP, TCP_FASTOPEN, (const char*)&value, sizeof(value));
-		setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&value, sizeof(value));
+		setsockopt(handle, IPPROTO_TCP, TCP_FASTOPEN, (const char*)&value, sizeof(value));
+		setsockopt(handle, SOL_SOCKET, SO_REUSEADDR, (const char*)&value, sizeof(value));
 	}
-	clients = 0;
-}
-
-SocketListener::~SocketListener()
-{
-	Cancel();
-	if (listener->joinable())
 	{
-		listener->join();
-	}
-	if (socket != -1)
-	{
-		shutdown(socket, 2);
-		closesocket(socket);
-		socket = -1;
-	}
-#ifdef _WIN32
-	WSACleanup();
-#endif // _WIN32
-}
-
-std::shared_ptr<std::thread> & SocketListener::Listen(in6_addr address, int port)
-{
-	if (socket == -1)
-		return std::shared_ptr<std::thread>();
-	{
-		sockaddr_in6 saddress;
-		memset(&saddress, 0, sizeof(sockaddr_in6));
-		saddress.sin6_family = AF_INET6;
-		saddress.sin6_addr = address;
-		saddress.sin6_port = htons(port);
-		if (::bind(socket, (sockaddr *)&saddress, sizeof(saddress)) == -1)
+		if (::bind(handle, address.get(), addresslen) == -1)
 			return std::shared_ptr<std::thread>();
 	}
-	if (listen(socket, 10) == -1)
+	if (listen(handle, 10) == -1)
 		return std::shared_ptr<std::thread>();
 	cancel = false;
 	return listener = std::make_shared<std::thread>([this]() {
 		while (!cancel)
 		{
 			auto socket = Accept();
-			if(socket)
+			if (socket)
 				OnConnection(socket);
 		}
 	});
@@ -80,16 +76,18 @@ std::shared_ptr<std::thread> & SocketListener::Listen(in6_addr address, int port
 void SocketListener::Cancel()
 {
 	cancel = true;
+	if (listener && listener->joinable())
+		listener->join();
 }
 
 std::shared_ptr<Socket> SocketListener::Accept()
 {
-	sockaddr_in6 addresse;
-	socklen_t size = sizeof(addresse);
-	int socket = accept(this->socket, (sockaddr*)&addresse, &size);
+	std::shared_ptr<sockaddr_storage> address = std::make_shared<sockaddr_storage>();
+	socklen_t size = sizeof(sockaddr_storage);
+	SOCKET socket = accept(this->handle, (sockaddr*)address.get(), &size);
 	if (socket == -1)
 		return std::shared_ptr<Socket>();
-	return std::make_shared<Socket>(socket, addresse.sin6_addr, ntohs(addresse.sin6_port));
+	return std::make_shared<Socket>(socket, std::shared_ptr<sockaddr>(address, (sockaddr*)address.get()));
 }
 
 void SocketListener::SetConnectionHandler(std::function<void(std::shared_ptr<Socket>)> onconnection)

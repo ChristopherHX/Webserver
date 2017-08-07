@@ -67,15 +67,15 @@ Connection::Connection()
 	memcpy(this->settings, ssettings, sizeof(settings));
 }
 
-Connection::Connection(uintptr_t csocket, const sockaddr_in6 &address) : Connection()
+Connection::Connection(uintptr_t csocket, const sockaddr_in6 &socketaddress) : Connection()
 {
 	this->csocket = csocket;
-	this->address = address;
+	this->socketaddress = socketaddress;
 }
 
 Connection::Connection(Connection&& con)
 {
-	this->address = con.address;
+	this->socketaddress = con.socketaddress;
 	this->csocket = con.csocket;
 	this->cssl = con.cssl;
 	{
@@ -89,7 +89,7 @@ Connection::Connection(Connection&& con)
 
 Connection::Connection(const Connection& con)
 {
-	this->address = con.address;
+	this->socketaddress = con.socketaddress;
 	this->csocket = con.csocket;
 	this->cssl = con.cssl;
 	this->streams = con.streams;
@@ -108,7 +108,7 @@ Connection::~Connection()
 
 Connection & Connection::operator=(const Connection & con)
 {
-	this->address = con.address;
+	this->socketaddress = con.socketaddress;
 	this->csocket = con.csocket;
 	this->cssl = con.cssl;
 	this->streams = con.streams;
@@ -486,12 +486,12 @@ void Server::processHeaderblock(RequestContext& rcontext)
 			size_t pq = res->second.find('?');
 			if (pq != std::string::npos)
 			{
-				rcontext.query = Utility::urlDecode(String::Replace(res->second.substr(pq + 1), "+", " "));
-				rcontext.path /= Utility::urlDecode(res->second.substr(0, pq));
+				rcontext.query = Utility::UrlDecode(String::Replace(res->second.substr(pq + 1), "+", " "));
+				rcontext.path /= Utility::UrlDecode(res->second.substr(0, pq));
 			}
 			else
 			{
-				rcontext.path /= Utility::urlDecode(res->second);
+				rcontext.path /= Utility::UrlDecode(res->second);
 			}
 		}
 		rcontext.server.filehandler(rcontext);
@@ -708,7 +708,7 @@ void Server::connectionshandler()
 				Connection connection;
 				{
 					socklen_t sockaddr_len = sizeof(sockaddr_in6);
-					connection.csocket = accept(ssocket, (sockaddr *)&connection.address, &sockaddr_len);
+					connection.csocket = accept(ssocket, (sockaddr *)&connection.socketaddress, &sockaddr_len);
 					polllock.unlock();
 					if (connection.csocket == -1)
 					{

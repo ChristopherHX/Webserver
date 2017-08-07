@@ -6,7 +6,18 @@
 #include <iomanip>
 
 namespace Utility {
-    std::string urlEncode(const std::string &toEncode) {
+	std::string Replace(const std::string &str, const char * search, const char * replace)
+	{
+		std::string res = str;
+		for (size_t pos = res.find(search); pos < res.length() && pos != std::string::npos; pos = res.find(search, pos))
+		{
+			res = res.replace(pos, strlen(search), replace);
+			pos += strlen(replace);
+		}
+		return res;
+	}
+
+    std::string UrlEncode(const std::string &toEncode) {
         std::ostringstream out;
          
         for(std::string::size_type i=0; i < toEncode.length(); ++i) {
@@ -22,20 +33,20 @@ namespace Utility {
             ) {
                 out << toEncode.at(i);
             } else {
-                out << charToHex(toEncode.at(i));
+                out << CharToHex(toEncode.at(i));
             }
         }
          
         return out.str();
     }
  
-    std::string urlDecode(const std::string &toDecode) {
+    std::string UrlDecode(const std::string &toDecode) {
         std::ostringstream out;
          
         for(std::string::size_type i=0; i < toDecode.length(); ++i) {
             if(toDecode.at(i) == '%') {
                 std::string str(toDecode.substr(i+1, 2));
-                out << hexToChar(str);
+                out << HexToChar(str);
                 i += 2;
             } else {
                 out << toDecode.at(i);
@@ -45,7 +56,7 @@ namespace Utility {
         return out.str();
     }
  
-    std::string charToHex(unsigned char c) {
+    std::string CharToHex(unsigned char c) {
         short i = c;
          
         std::ostringstream s;
@@ -55,7 +66,7 @@ namespace Utility {
         return s.str();
     }
  
-    unsigned char hexToChar(const std::string &str) {
+    unsigned char HexToChar(const std::string &str) {
         short c = 0;
          
         if(!str.empty()) {

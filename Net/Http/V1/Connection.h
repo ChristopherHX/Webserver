@@ -12,7 +12,7 @@ namespace Net
             private:
                 std::function<void(const uint8_t*buffer, uint32_t length)> _ondata;
             public:
-				Connection(std::shared_ptr<Net::Socket> socket, Request request);
+				//Connection(std::shared_ptr<Net::Socket> socket, Request request);
 
                 void SendResponse(bool endstream = false) override;
                 void SendData(uint8_t * buffer, int length, bool endstream = false) override;
