@@ -16,13 +16,13 @@ namespace Net
 				private:
 					std::vector<std::pair<std::string, std::string>> dynamictable;
 				public:
-					const uint8_t * DecodeHeaderblock(const uint8_t * pos, const uint8_t * end, std::vector<std::pair<std::string, std::string>>& headerlist);
+					void DecodeHeaderblock(std::vector<uint8_t>::const_iterator & pos, size_t length, std::vector<std::pair<std::string, std::string>>& headerlist);
 
-					static const uint8_t * DecodeInteger(const uint8_t * pos, uint64_t & integer, uint8_t bits);
+					static uint64_t DecodeInteger(std::vector<uint8_t>::const_iterator & pos, uint8_t bits);
 
-					static const uint8_t * DecodeHuffmanString(const uint8_t * pos, std::string & string, long long length);
+					static std::string DecodeHuffmanString(std::vector<uint8_t>::const_iterator & pos, long long length);
 
-					static const uint8_t * DecodeString(const uint8_t * pos, std::string & string);
+					static std::string DecodeString(std::vector<uint8_t>::const_iterator & pos);
 				};
 			}
 		}

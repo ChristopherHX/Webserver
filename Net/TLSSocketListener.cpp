@@ -110,7 +110,7 @@ bool TLSSocketListener::UseCertificate(const uint8_t * buffer, int length, SSLFi
 	}
 }
 
-std::shared_ptr<std::thread> & TLSSocketListener::Listen(const std::shared_ptr<sockaddr> &address, socklen_t addresslen)
+std::shared_ptr<std::thread> TLSSocketListener::Listen(const std::shared_ptr<sockaddr> &address, socklen_t addresslen)
 {
 	if (SSL_CTX_check_private_key(sslctx) != 1)
 		return std::shared_ptr<std::thread>();

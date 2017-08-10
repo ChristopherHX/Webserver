@@ -8,18 +8,18 @@ void Connection::SendResponse(bool endstream)
 	socket->SendAll((uint8_t*)header.data(), header.length());
 }
 
-void Connection::SendData(uint8_t * buffer, int length, bool endstream)
+void Connection::SendData(const uint8_t * buffer, int length, bool endstream)
 {
 	socket->SendAll(buffer, length);
 }
 
-void Connection::OnData(const uint8_t * buffer, uint32_t length)
+void Connection::OnData(std::vector<uint8_t>::const_iterator & buffer, uint32_t length)
 {
 	if (_ondata)
 		_ondata(buffer, length);
 }
 
-void Connection::SetOnData(std::function<void(const uint8_t*buffer, uint32_t length)> ondata)
+void Connection::SetOnData(std::function<void(std::vector<uint8_t>::const_iterator & buffer, uint32_t length)> ondata)
 {
 	_ondata = ondata;
 }

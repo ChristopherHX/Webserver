@@ -15,8 +15,8 @@ namespace Net
 				Frame frame;
 				std::shared_ptr<Stream> stream;
 				void SendResponse(bool endstream = false) override;
-				void SendData(uint8_t * buffer, int length, bool endstream = false) override;
-				void SetOnData(std::function<void(const uint8_t * buffer, uint32_t length)> ondata) override;
+				void SendData(const uint8_t * buffer, int length, bool endstream = false) override;
+				void SetOnData(std::function<void(std::vector<uint8_t>::const_iterator & buffer, uint32_t length)> ondata) override;
 			};
 		}
     }

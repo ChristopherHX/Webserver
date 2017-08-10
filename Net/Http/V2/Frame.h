@@ -2,8 +2,11 @@
 #include <cstdint>
 #include <vector>
 
-uint32_t GetUInt31(const uint8_t * source);
-void AddUInt31(uint32_t source, uint8_t * destination);
+uint16_t GetUInt16(std::vector<uint8_t>::const_iterator & buffer);
+uint32_t GetUInt31(std::vector<uint8_t>::const_iterator & buffer);
+uint32_t GetUInt32(std::vector<uint8_t>::const_iterator & buffer);
+void AddUInt31(uint32_t number, std::vector<uint8_t>::iterator & destination);
+void AddUInt32(uint32_t number, std::vector<uint8_t>::iterator & destination);
 
 namespace Net
 {
@@ -36,12 +39,14 @@ namespace Net
 
 			struct Frame
 			{
+			public:
 				uint32_t length;
 				FrameType type;
 				FrameFlag flags;
 				uint32_t streamidentifier;
+				Frame();
+				Frame(std::vector<uint8_t>::const_iterator & buffer);
 				bool HasFlag(FrameFlag flag);
-				static Frame Parse(const uint8_t * source);
 				std::vector<uint8_t> ToArray();
 			};
 		}

@@ -14,7 +14,7 @@ namespace Net
 		std::function<void(std::shared_ptr<Socket>)> _onconnection;
 		std::shared_ptr<std::thread> listener;
 		bool cancel;
-		int clients;
+		//int clients;
 		std::shared_ptr<sockaddr> address;
 	protected:
 		virtual std::shared_ptr<Socket> Accept();
@@ -22,7 +22,7 @@ namespace Net
 	public:
 		SocketListener();
 		virtual ~SocketListener();
-		virtual std::shared_ptr<std::thread> & Listen(const std::shared_ptr<sockaddr> &address, socklen_t addresslen);
+		virtual std::shared_ptr<std::thread> Listen(const std::shared_ptr<sockaddr> &address, socklen_t addresslen);
 		void Cancel();
 		void SetConnectionHandler(std::function<void(std::shared_ptr<Socket>)> onconnection);
 	};

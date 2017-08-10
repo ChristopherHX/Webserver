@@ -38,10 +38,12 @@ namespace Net
 		std::string GetProtocol();
 		virtual int Receive(uint8_t * buffer, int length);
 		bool ReceiveAll(uint8_t * buffer, int length);
-		virtual int Send(uint8_t * buffer, int length);
+		virtual int Send(const uint8_t * buffer, int length);
 		int Send(std::vector<uint8_t> buffer);
-		bool SendAll(uint8_t * buffer, int length);
+		int Send(std::vector<uint8_t> buffer, int length);
+		bool SendAll(const uint8_t * buffer, int length);
 		bool SendAll(std::vector<uint8_t> buffer);
+		bool SendAll(std::vector<uint8_t> buffer, int length);
 		virtual int SendTo(uint8_t * buffer, int length, const sockaddr * to, socklen_t tolength);
 		virtual int ReceiveFrom(uint8_t * buffer, int length, sockaddr * from, socklen_t * fromlength);
 	};

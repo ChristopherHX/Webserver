@@ -13,6 +13,6 @@ namespace Net
 		TLSSocket(SSL_CTX * sslctx, const std::shared_ptr<Socket>& socket);
 		~TLSSocket();
 		int Receive(uint8_t * buffer, int length) override;
-		int Send(uint8_t * buffer, int length) override;
+		int Send(const uint8_t * buffer, int length) override;
 	};
 }

@@ -11,7 +11,7 @@ SocketListener::SocketListener()
 	WSAStartup(WINSOCK_VERSION, &data);
 #endif // _WIN32
 	handle = -1;
-	clients = 0;
+	//clients = 0;
 }
 
 SocketListener::~SocketListener()
@@ -34,21 +34,21 @@ SocketListener::~SocketListener()
 
 bool SocketListener::OnConnection(std::shared_ptr<Socket> socket)
 {
-	if (!_onconnection || clients > 10)
+	if (!_onconnection/* || clients > 10*/)
 		return false;
-	clients++;
+	//clients++;
 	std::thread([this, socket]() {
 		_onconnection(socket);
-		clients--;
+		//clients--;
 	}).detach();
 	return true;
 }
 
-std::shared_ptr<std::thread>& Net::SocketListener::Listen(const std::shared_ptr<sockaddr>& address, socklen_t addresslen)
+std::shared_ptr<std::thread> Net::SocketListener::Listen(const std::shared_ptr<sockaddr>& address, socklen_t addresslen)
 {
 	if (handle == -1)
 	{
-		if ((handle = ::socket(address->sa_family, SOCK_STREAM, 0)) == -1)
+		if ((handle = socket(address->sa_family, SOCK_STREAM, 0)) == -1)
 			return listener = std::shared_ptr<std::thread>();
 		uint32_t value = 0;
 		setsockopt(handle, IPPROTO_IPV6, IPV6_V6ONLY, (const char*)&value, sizeof(value));
@@ -57,7 +57,7 @@ std::shared_ptr<std::thread>& Net::SocketListener::Listen(const std::shared_ptr<
 		setsockopt(handle, SOL_SOCKET, SO_REUSEADDR, (const char*)&value, sizeof(value));
 	}
 	{
-		if (::bind(handle, address.get(), addresslen) == -1)
+		if (bind(handle, address.get(), addresslen) == -1)
 			return std::shared_ptr<std::thread>();
 	}
 	if (listen(handle, 10) == -1)

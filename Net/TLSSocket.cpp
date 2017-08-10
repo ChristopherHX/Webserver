@@ -37,7 +37,7 @@ int TLSSocket::Receive(uint8_t * buffer, int length)
 	return SSL_read(ssl, buffer, length);
 }
 
-int TLSSocket::Send(uint8_t * buffer, int length)
+int TLSSocket::Send(const uint8_t * buffer, int length)
 {
 	return SSL_write(ssl, buffer, length);
 }

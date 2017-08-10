@@ -29,6 +29,6 @@ namespace Net
 		bool UsePrivateKey(const uint8_t * buffer, int length, SSLFileType ftype);
 		bool UseCertificate(const std::string & certificate, SSLFileType ftype);
 		bool UseCertificate(const uint8_t * buffer, int length, SSLFileType ftype);
-		std::shared_ptr<std::thread> & Listen(const std::shared_ptr<sockaddr> &address, socklen_t addresslen) override;
+		std::shared_ptr<std::thread> Listen(const std::shared_ptr<sockaddr> &address, socklen_t addresslen) override;
 	};
 }

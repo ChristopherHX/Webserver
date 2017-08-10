@@ -14,12 +14,14 @@ namespace Net
 		{
 		public:
 			static Request ParseHttp1(const uint8_t * buffer, int length);
-			void ParseUrl(const std::string &path);
-			void AppendHttp2(V2::HPack::Decoder & decoder, const uint8_t * buffer, int length);
+			void ParseUri(const std::string &path);
+			void DecodeHeaderblock(std::shared_ptr<V2::HPack::Decoder> & decoder, std::vector<uint8_t>::const_iterator & buffer, int length);
 			std::string method;
+			std::string uri;
 			std::string path;
 			std::string query;
-			uintmax_t length;
+			std::string contenttype;
+			uintmax_t contentlength;
 			std::vector<std::pair<std::string, std::string>> headerlist;
 		};
 	}

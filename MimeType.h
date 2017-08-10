@@ -4,8 +4,8 @@
 
 using namespace std;
 
-static class MimeType
+class MimeType
 {
 public:
-	static string Get(const string & extention);
+	string Get(const string & extention);
 };

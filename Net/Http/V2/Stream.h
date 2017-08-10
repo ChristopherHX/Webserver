@@ -23,29 +23,29 @@ namespace Net
 
 			enum class StreamState : uint8_t
 			{
-				idle,
-				reserved_local,
-				reserved_remote,
-				open,
-				half_closed_local,
-				half_closed_remote,
-				closed
+				idle = 0b0,
+				reserved_local = 0b0100,
+				reserved_remote = 0b1000,
+				open = 0b11,
+				half_closed_local = 0b10,
+				half_closed_remote = 0b01,
+				closed = 0b10000
 			};
 
 			class Stream
 			{
 			private:
-				std::function<void(const uint8_t * buffer, uint32_t length)> _ondata;
-				std::function<void(Frame & frame, const uint8_t * buffer, uint32_t length)> _oncontinuation;
+				std::function<void(std::vector<uint8_t>::const_iterator & buffer, uint32_t length)> _ondata;
+				std::function<void(Frame & frame, std::vector<uint8_t>::const_iterator & buffer, uint32_t length)> _oncontinuation;
 			public:
 				Stream(uint32_t identifier);
 				uint32_t identifier;
 				StreamState state;
 				StreamPriority priority;
-				void OnData(const uint8_t * buffer, uint32_t length);
-				void SetOnData(std::function<void(const uint8_t * buffer, uint32_t length)> ondata);
-				void OnContinuation(Frame & frame, const uint8_t * buffer, uint32_t length);
-				void SetOnContinuation(std::function<void(Frame & frame, const uint8_t * buffer, uint32_t length)> ondata);
+				void OnData(std::vector<uint8_t>::const_iterator & buffer, uint32_t length);
+				void SetOnData(std::function<void(std::vector<uint8_t>::const_iterator & buffer, uint32_t length)> ondata);
+				void OnContinuation(Frame & frame, std::vector<uint8_t>::const_iterator & buffer, uint32_t length);
+				void SetOnContinuation(std::function<void(Frame & frame, std::vector<uint8_t>::const_iterator & buffer, uint32_t length)> ondata);
 			};
 		}
 	}

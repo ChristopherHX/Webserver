@@ -16,7 +16,7 @@ Request Request::ParseHttp1(const uint8_t * buffer, int length)
 	std::string path(ofl, ofr);
 	ofl = ofr + 1;
 	ofr = (const uint8_t *)memchr(ofl, '\r', length - (ofl - buffer));
-	request.ParseUrl(path);
+	request.ParseUri(path);
 	request.headerlist.push_back({ ":method", request.method });
 	request.headerlist.push_back({ ":path", path });
 	while (ofr + 2 < buffer + length)
@@ -36,31 +36,32 @@ Request Request::ParseHttp1(const uint8_t * buffer, int length)
 	{
 		if (entry.first == "content-length")
 		{
-			request.length = std::stoll(entry.second);
+			request.contentlength = std::stoll(entry.second);
 		}
 	}
 	return request;
 }
 
-void Request::ParseUrl(const std::string & path)
+void Request::ParseUri(const std::string & uri)
 {
-	size_t sep = path.find('?');
+	size_t sep = uri.find('?');
 	if (sep != std::string::npos)
 	{
-		query = path.substr(sep + 1);
+		query = uri.substr(sep + 1);
 		std::transform(query.begin(), query.end(), query.begin(), [](char ch) {return ch == '+' ? ' ' : ch; });
 		query = Utility::UrlDecode(query);
-		this->path = Utility::UrlDecode(path.substr(0, sep));
+		path = Utility::UrlDecode(uri.substr(0, sep));
+		this->uri = path + '?' + query;
 	}
 	else
 	{
-		this->path = Utility::UrlDecode(path);
+		this->uri = path = Utility::UrlDecode(uri);
 	}
 }
 
-void Request::AppendHttp2(Net::Http::V2::HPack::Decoder & decoder, const uint8_t * buffer, int length)
+void Net::Http::Request::DecodeHeaderblock(std::shared_ptr<V2::HPack::Decoder>& decoder, std::vector<uint8_t>::const_iterator & buffer, int length)
 {
-	decoder.DecodeHeaderblock(buffer, buffer + length, headerlist);
+	decoder->DecodeHeaderblock(buffer, length, headerlist);
 	for (auto & entry : headerlist)
 	{
 		if (entry.first == ":method")
@@ -69,11 +70,15 @@ void Request::AppendHttp2(Net::Http::V2::HPack::Decoder & decoder, const uint8_t
 		}
 		else if (entry.first == ":path")
 		{
-			ParseUrl(entry.second);
+			ParseUri(entry.second);
 		}
 		else if (entry.first == "content-length")
 		{
-			this->length = std::stoll(entry.second);
+			this->contentlength = std::stoll(entry.second);
+		}
+		else if (entry.first == "content-type")
+		{
+			this->contenttype = entry.second;
 		}
 	}
 }

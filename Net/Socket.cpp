@@ -80,9 +80,9 @@ bool Socket::ReceiveAll(uint8_t * buffer, int length)
 	return true;
 }
 
-int Socket::Send(uint8_t * buffer, int length)
+int Socket::Send(const uint8_t * buffer, int length)
 {
-	return send(handle, (char*)buffer, length, 0);
+	return send(handle, (const char*)buffer, length, 0);
 }
 
 int Socket::Send(std::vector<uint8_t> buffer)
@@ -90,7 +90,12 @@ int Socket::Send(std::vector<uint8_t> buffer)
 	return Send(buffer.data(), buffer.size());
 }
 
-bool Socket::SendAll(uint8_t * buffer, int length)
+int Net::Socket::Send(std::vector<uint8_t> buffer, int length)
+{
+	return Send(buffer.data(), length);
+}
+
+bool Socket::SendAll(const uint8_t * buffer, int length)
 {
 	return Send(buffer, length) == length;
 }
@@ -98,6 +103,11 @@ bool Socket::SendAll(uint8_t * buffer, int length)
 bool Socket::SendAll(std::vector<uint8_t> buffer)
 {
 	return SendAll(buffer.data(), buffer.size());
+}
+
+bool Socket::SendAll(std::vector<uint8_t> buffer, int length)
+{
+	return SendAll(buffer.data(), length);
 }
 
 int Socket::SendTo(uint8_t * buffer, int length, const sockaddr * to, socklen_t tolength)
