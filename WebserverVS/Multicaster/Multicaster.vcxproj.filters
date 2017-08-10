@@ -2,10 +2,10 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="..\..\..\Net\SocketListener.cpp">
+    <ClCompile Include="..\..\Net\SocketListener.cpp">
       <Filter>Net</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\Socket.cpp">
+    <ClCompile Include="..\..\Net\Socket.cpp">
       <Filter>Net</Filter>
     </ClCompile>
   </ItemGroup>
@@ -15,10 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\Net\Socket.h">
+    <ClInclude Include="..\..\Net\Socket.h">
       <Filter>Net</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\SocketListener.h">
+    <ClInclude Include="..\..\Net\SocketListener.h">
       <Filter>Net</Filter>
     </ClInclude>
   </ItemGroup>

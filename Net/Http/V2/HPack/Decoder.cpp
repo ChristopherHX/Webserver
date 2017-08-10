@@ -5,8 +5,10 @@
 
 using namespace Net::Http::V2::HPack;
 
-void Decoder::DecodeHeaderblock(std::vector<uint8_t>::const_iterator & pos, size_t length, std::vector<std::pair<std::string, std::string>>& headerlist)
+void Decoder::DecodeHeaderblock(Net::Http::Request * request, std::vector<uint8_t>::const_iterator & pos, size_t length)
 {
+	static std::hash<std::string> hash_fn;
+	static const size_t path = hash_fn(":path"), authority = hash_fn(":authority"), scheme = hash_fn(":scheme"), method = hash_fn(":method"), status = hash_fn(":status");
 	auto end = pos + length;
 	while (pos != end)
 	{
@@ -18,7 +20,33 @@ void Decoder::DecodeHeaderblock(std::vector<uint8_t>::const_iterator & pos, size
 				throw std::runtime_error("Compressionsfehler invalid index");
 			}
 			auto & el = index < 62 ? StaticTable[index - 1] : *(dynamictable.end() - (index - 61));
-			headerlist.push_back(el);
+			{
+				size_t hash = hash_fn(el.first);
+				if (hash == path)
+				{
+					request->ParseUri(el.second);
+				}
+				else if(hash == authority)
+				{
+					request->authority = el.second;
+				}
+				else if(hash == scheme)
+				{
+					request->scheme = el.second;
+				}
+				else if (hash == method)
+				{
+					request->method = el.second;
+				}
+				//else if (hash == status)
+				//{
+				//	request->status = el.second;
+				//}
+				else
+				{
+					request->headerlist.insert(el);
+				}
+			}
 		}
 		else if ((*pos & 0x40) != 0)
 		{

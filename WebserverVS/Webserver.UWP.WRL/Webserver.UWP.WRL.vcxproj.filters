@@ -30,16 +30,16 @@
     <ClCompile Include="..\..\..\Http\Stream.cpp" />
     <ClCompile Include="..\..\..\Http\utility.cpp" />
     <ClCompile Include="..\..\..\Http\Connection.cpp" />
-    <ClCompile Include="..\..\..\Net\TLSSocket.cpp">
+    <ClCompile Include="..\..\Net\TLSSocket.cpp">
       <Filter>Net</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\TLSSocketListener.cpp">
+    <ClCompile Include="..\..\Net\TLSSocketListener.cpp">
       <Filter>Net</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\Socket.cpp">
+    <ClCompile Include="..\..\Net\Socket.cpp">
       <Filter>Net</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\SocketListener.cpp">
+    <ClCompile Include="..\..\Net\SocketListener.cpp">
       <Filter>Net</Filter>
     </ClCompile>
   </ItemGroup>
@@ -61,16 +61,16 @@
     <ClInclude Include="..\..\..\Http\Stream.h" />
     <ClInclude Include="..\..\..\Http\utility.h" />
     <ClInclude Include="..\..\..\Http\Connection.h" />
-    <ClInclude Include="..\..\..\Net\SocketListener.h">
+    <ClInclude Include="..\..\Net\SocketListener.h">
       <Filter>Net</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\TLSSocket.h">
+    <ClInclude Include="..\..\Net\TLSSocket.h">
       <Filter>Net</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\TLSSocketListener.h">
+    <ClInclude Include="..\..\Net\TLSSocketListener.h">
       <Filter>Net</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\Socket.h">
+    <ClInclude Include="..\..\Net\Socket.h">
       <Filter>Net</Filter>
     </ClInclude>
   </ItemGroup>

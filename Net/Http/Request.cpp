@@ -61,7 +61,7 @@ void Request::ParseUri(const std::string & uri)
 
 void Net::Http::Request::DecodeHeaderblock(std::shared_ptr<V2::HPack::Decoder>& decoder, std::vector<uint8_t>::const_iterator & buffer, int length)
 {
-	decoder->DecodeHeaderblock(buffer, length, headerlist);
+	decoder->DecodeHeaderblock(this, buffer, length, headerlist);
 	for (auto & entry : headerlist)
 	{
 		if (entry.first == ":method")

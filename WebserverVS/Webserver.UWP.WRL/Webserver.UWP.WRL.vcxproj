@@ -194,10 +194,10 @@
     <ClInclude Include="..\..\..\Http\Setting.h" />
     <ClInclude Include="..\..\..\Http\Stream.h" />
     <ClInclude Include="..\..\..\Http\utility.h" />
-    <ClInclude Include="..\..\..\Net\Socket.h" />
-    <ClInclude Include="..\..\..\Net\SocketListener.h" />
-    <ClInclude Include="..\..\..\Net\TLSSocket.h" />
-    <ClInclude Include="..\..\..\Net\TLSSocketListener.h" />
+    <ClInclude Include="..\..\Net\Socket.h" />
+    <ClInclude Include="..\..\Net\SocketListener.h" />
+    <ClInclude Include="..\..\Net\TLSSocket.h" />
+    <ClInclude Include="..\..\Net\TLSSocketListener.h" />
     <ClInclude Include="AboutPage.xaml.h">
       <DependentUpon>AboutPage.xaml</DependentUpon>
     </ClInclude>
@@ -266,10 +266,10 @@
     <ClCompile Include="..\..\..\Http\Response.cpp" />
     <ClCompile Include="..\..\..\Http\Stream.cpp" />
     <ClCompile Include="..\..\..\Http\utility.cpp" />
-    <ClCompile Include="..\..\..\Net\Socket.cpp" />
-    <ClCompile Include="..\..\..\Net\SocketListener.cpp" />
-    <ClCompile Include="..\..\..\Net\TLSSocket.cpp" />
-    <ClCompile Include="..\..\..\Net\TLSSocketListener.cpp" />
+    <ClCompile Include="..\..\Net\Socket.cpp" />
+    <ClCompile Include="..\..\Net\SocketListener.cpp" />
+    <ClCompile Include="..\..\Net\TLSSocket.cpp" />
+    <ClCompile Include="..\..\Net\TLSSocketListener.cpp" />
     <ClCompile Include="AboutPage.xaml.cpp">
       <DependentUpon>AboutPage.xaml</DependentUpon>
     </ClCompile>

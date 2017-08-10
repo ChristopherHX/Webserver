@@ -13,107 +13,107 @@
     <Filter Include="Net\Http\V1">
       <UniqueIdentifier>{35599b76-8a65-446b-bfc6-a15aac86464f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Net\Http\HPack">
+    <Filter Include="Net\Http\V2\HPack">
       <UniqueIdentifier>{0702a364-1e14-4a47-a643-52a931dc40b9}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\Net\TLSSocket.cpp">
+    <ClCompile Include="..\..\Net\TLSSocket.cpp">
       <Filter>Net</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\TLSSocketListener.cpp">
+    <ClCompile Include="..\..\Net\TLSSocketListener.cpp">
       <Filter>Net</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\Socket.cpp">
+    <ClCompile Include="..\..\Net\Socket.cpp">
       <Filter>Net</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\SocketListener.cpp">
+    <ClCompile Include="..\..\Net\SocketListener.cpp">
       <Filter>Net</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\utility.cpp" />
-    <ClCompile Include="..\..\..\MimeType.cpp" />
-    <ClCompile Include="..\..\..\Net\Http\V2\Frame.cpp">
+    <ClCompile Include="..\..\utility.cpp" />
+    <ClCompile Include="..\..\MimeType.cpp" />
+    <ClCompile Include="..\..\Net\Http\V2\Frame.cpp">
       <Filter>Net\Http\V2</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\Http\V2\HPack\Decoder.cpp">
-      <Filter>Net\Http\HPack</Filter>
+    <ClCompile Include="..\..\Net\Http\V2\HPack\Decoder.cpp">
+      <Filter>Net\Http\V2\HPack</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\Http\V2\HPack\Encoder.cpp">
-      <Filter>Net\Http\HPack</Filter>
+    <ClCompile Include="..\..\Net\Http\V2\HPack\Encoder.cpp">
+      <Filter>Net\Http\V2\HPack</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\Http\V2\HPack\HPack.cpp">
-      <Filter>Net\Http\HPack</Filter>
+    <ClCompile Include="..\..\Net\Http\V2\HPack\HPack.cpp">
+      <Filter>Net\Http\V2\HPack</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\Http\V2\Connection.cpp">
+    <ClCompile Include="..\..\Net\Http\V2\Connection.cpp">
       <Filter>Net\Http\V2</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\Http\Response.cpp">
+    <ClCompile Include="..\..\Net\Http\Response.cpp">
       <Filter>Net\Http</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\Http\Request.cpp">
+    <ClCompile Include="..\..\Net\Http\Request.cpp">
       <Filter>Net\Http</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\Http\V2\Stream.cpp">
+    <ClCompile Include="..\..\Net\Http\V2\Stream.cpp">
       <Filter>Net\Http\V2</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\Http\V1\Connection.cpp">
+    <ClCompile Include="..\..\Net\Http\V1\Connection.cpp">
       <Filter>Net\Http\V1</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\Net\TLSSocket.h">
+    <ClInclude Include="..\..\Net\TLSSocket.h">
       <Filter>Net</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\TLSSocketListener.h">
+    <ClInclude Include="..\..\Net\TLSSocketListener.h">
       <Filter>Net</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\Socket.h">
+    <ClInclude Include="..\..\Net\Socket.h">
       <Filter>Net</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\SocketListener.h">
+    <ClInclude Include="..\..\Net\SocketListener.h">
       <Filter>Net</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\utility.h" />
-    <ClInclude Include="..\..\..\MimeType.h" />
-    <ClInclude Include="..\..\..\Net\Http\V2\ErrorCode.h">
+    <ClInclude Include="..\..\utility.h" />
+    <ClInclude Include="..\..\MimeType.h" />
+    <ClInclude Include="..\..\Net\Http\V2\ErrorCode.h">
       <Filter>Net\Http\V2</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\Http\V2\Frame.h">
+    <ClInclude Include="..\..\Net\Http\V2\Frame.h">
       <Filter>Net\Http\V2</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\Http\V2\HPack\Decoder.h">
-      <Filter>Net\Http\HPack</Filter>
+    <ClInclude Include="..\..\Net\Http\V2\HPack\Decoder.h">
+      <Filter>Net\Http\V2\HPack</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\Http\V2\HPack\Encoder.h">
-      <Filter>Net\Http\HPack</Filter>
+    <ClInclude Include="..\..\Net\Http\V2\HPack\Encoder.h">
+      <Filter>Net\Http\V2\HPack</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\Http\V2\HPack\HPack.h">
-      <Filter>Net\Http\HPack</Filter>
+    <ClInclude Include="..\..\Net\Http\V2\HPack\HPack.h">
+      <Filter>Net\Http\V2\HPack</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\Http\Request.h">
+    <ClInclude Include="..\..\Net\Http\Request.h">
       <Filter>Net\Http</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\Http\Response.h">
+    <ClInclude Include="..\..\Net\Http\Response.h">
       <Filter>Net\Http</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\Http\Connection.h">
+    <ClInclude Include="..\..\Net\Http\Connection.h">
       <Filter>Net\Http</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\Http\V2\Connection.h">
+    <ClInclude Include="..\..\Net\Http\V2\Connection.h">
       <Filter>Net\Http\V2</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\Http\V2\Stream.h">
+    <ClInclude Include="..\..\Net\Http\V2\Stream.h">
       <Filter>Net\Http\V2</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\Http\V2\Setting.h">
+    <ClInclude Include="..\..\Net\Http\V2\Setting.h">
       <Filter>Net\Http\V2</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Net\Http\V1\Connection.h">
+    <ClInclude Include="..\..\Net\Http\V1\Connection.h">
       <Filter>Net\Http\V1</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\Net\Net.def">
+    <None Include="..\..\Net\Net.def">
       <Filter>Net</Filter>
     </None>
   </ItemGroup>

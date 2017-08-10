@@ -19,16 +19,16 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\Net\Socket.cpp" />
-    <ClCompile Include="..\..\..\Net\SocketListener.cpp" />
-    <ClCompile Include="..\..\..\Net\TLSSocket.cpp" />
-    <ClCompile Include="..\..\..\Net\TLSSocketListener.cpp" />
+    <ClCompile Include="..\..\Net\Socket.cpp" />
+    <ClCompile Include="..\..\Net\SocketListener.cpp" />
+    <ClCompile Include="..\..\Net\TLSSocket.cpp" />
+    <ClCompile Include="..\..\Net\TLSSocketListener.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\Net\Socket.h" />
-    <ClInclude Include="..\..\..\Net\SocketListener.h" />
-    <ClInclude Include="..\..\..\Net\TLSSocket.h" />
-    <ClInclude Include="..\..\..\Net\TLSSocketListener.h" />
+    <ClInclude Include="..\..\Net\Socket.h" />
+    <ClInclude Include="..\..\Net\SocketListener.h" />
+    <ClInclude Include="..\..\Net\TLSSocket.h" />
+    <ClInclude Include="..\..\Net\TLSSocketListener.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

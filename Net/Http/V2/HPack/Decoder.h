@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Request.h"
 #include <cstdint>
 #include <vector>
 #include <string>
@@ -16,7 +17,7 @@ namespace Net
 				private:
 					std::vector<std::pair<std::string, std::string>> dynamictable;
 				public:
-					void DecodeHeaderblock(std::vector<uint8_t>::const_iterator & pos, size_t length, std::vector<std::pair<std::string, std::string>>& headerlist);
+					void DecodeHeaderblock(Net::Http::Request * request, std::vector<uint8_t>::const_iterator & pos, size_t length);
 
 					static uint64_t DecodeInteger(std::vector<uint8_t>::const_iterator & pos, uint8_t bits);
 

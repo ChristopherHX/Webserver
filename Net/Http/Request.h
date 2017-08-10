@@ -3,7 +3,7 @@
 #include "V2/HPack/Decoder.h"
 #include <string>
 #include <memory>
-#include <vector>
+#include <unordered_map>
 #include <cstdint>
 
 namespace Net
@@ -22,7 +22,9 @@ namespace Net
 			std::string query;
 			std::string contenttype;
 			uintmax_t contentlength;
-			std::vector<std::pair<std::string, std::string>> headerlist;
+			std::string scheme;
+			std::string authority;
+			std::unordered_map<std::string, std::string> headerlist;
 		};
 	}
 }

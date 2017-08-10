@@ -127,7 +127,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <AdditionalDependencies>libssl.lib;libcrypto.lib;ws2_32.lib;kernel32.lib;user32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <ModuleDefinitionFile>C:\Users\Christopher\Documents\Webserver\Net\Net.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>..\..\Net\Net.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
@@ -142,8 +142,8 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <AdditionalDependencies>libssl.lib;libcrypto.lib;ws2_32.lib;kernel32.lib;user32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <ModuleDefinitionFile>C:\Users\Christopher\Documents\Webserver\Net\Net.def</ModuleDefinitionFile>
-      <AdditionalLibraryDirectories>C:\Users\Christopher\Documents\Webserver\win\arm</AdditionalLibraryDirectories>
+      <ModuleDefinitionFile>..\..\Net\Net.def</ModuleDefinitionFile>
+      <AdditionalLibraryDirectories>..\..\deps\Windows\ARM</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -158,7 +158,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <AdditionalDependencies>libssl.lib;libcrypto.lib;ws2_32.lib;kernel32.lib;user32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <ModuleDefinitionFile>C:\Users\Christopher\Documents\Webserver\Net\Net.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>..\..\Net\Net.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -176,7 +176,7 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <ModuleDefinitionFile>C:\Users\Christopher\Documents\Webserver\Net\Net.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>..\..\Net\Net.def</ModuleDefinitionFile>
       <AdditionalDependencies>libssl.lib;libcrypto.lib;ws2_32.lib;kernel32.lib;user32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -195,9 +195,9 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <ModuleDefinitionFile>C:\Users\Christopher\Documents\Webserver\Net\Net.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>..\..\Net\Net.def</ModuleDefinitionFile>
       <AdditionalDependencies>libssl.lib;libcrypto.lib;ws2_32.lib;kernel32.lib;user32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Users\Christopher\Documents\Webserver\win\arm</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\deps\Windows\ARM</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -215,16 +215,16 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <ModuleDefinitionFile>C:\Users\Christopher\Documents\Webserver\Net\Net.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>..\..\Net\Net.def</ModuleDefinitionFile>
       <AdditionalDependencies>libssl.lib;libcrypto.lib;ws2_32.lib;kernel32.lib;user32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\MimeType.cpp" />
-    <ClCompile Include="..\..\..\Net\Http\Request.cpp" />
-    <ClCompile Include="..\..\..\Net\Http\Response.cpp" />
-    <ClCompile Include="..\..\..\Net\Http\V1\Connection.cpp" />
-    <ClCompile Include="..\..\..\Net\Http\V2\Connection.cpp">
+    <ClCompile Include="..\..\MimeType.cpp" />
+    <ClCompile Include="..\..\Net\Http\Request.cpp" />
+    <ClCompile Include="..\..\Net\Http\Response.cpp" />
+    <ClCompile Include="..\..\Net\Http\V1\Connection.cpp" />
+    <ClCompile Include="..\..\Net\Http\V2\Connection.cpp">
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)Net\Http\V2\</ObjectFileName>
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)Net\Http\V2\</ObjectFileName>
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">$(IntDir)Net\Http\V2\</ObjectFileName>
@@ -244,39 +244,39 @@
       <AssemblerListingLocation Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)Net\Http\V2\</AssemblerListingLocation>
       <ProgramDataBaseFileName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)Net\Http\V2\vc$(PlatformToolsetVersion).pdb</ProgramDataBaseFileName>
     </ClCompile>
-    <ClCompile Include="..\..\..\Net\Http\V2\Frame.cpp" />
-    <ClCompile Include="..\..\..\Net\Http\V2\HPack\Decoder.cpp" />
-    <ClCompile Include="..\..\..\Net\Http\V2\HPack\Encoder.cpp" />
-    <ClCompile Include="..\..\..\Net\Http\V2\HPack\HPack.cpp" />
-    <ClCompile Include="..\..\..\Net\Http\V2\Stream.cpp" />
-    <ClCompile Include="..\..\..\Net\Socket.cpp" />
-    <ClCompile Include="..\..\..\Net\SocketListener.cpp" />
-    <ClCompile Include="..\..\..\Net\TLSSocket.cpp" />
-    <ClCompile Include="..\..\..\Net\TLSSocketListener.cpp" />
-    <ClCompile Include="..\..\..\utility.cpp" />
+    <ClCompile Include="..\..\Net\Http\V2\Frame.cpp" />
+    <ClCompile Include="..\..\Net\Http\V2\HPack\Decoder.cpp" />
+    <ClCompile Include="..\..\Net\Http\V2\HPack\Encoder.cpp" />
+    <ClCompile Include="..\..\Net\Http\V2\HPack\HPack.cpp" />
+    <ClCompile Include="..\..\Net\Http\V2\Stream.cpp" />
+    <ClCompile Include="..\..\Net\Socket.cpp" />
+    <ClCompile Include="..\..\Net\SocketListener.cpp" />
+    <ClCompile Include="..\..\Net\TLSSocket.cpp" />
+    <ClCompile Include="..\..\Net\TLSSocketListener.cpp" />
+    <ClCompile Include="..\..\utility.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\MimeType.h" />
-    <ClInclude Include="..\..\..\Net\Http\Connection.h" />
-    <ClInclude Include="..\..\..\Net\Http\Request.h" />
-    <ClInclude Include="..\..\..\Net\Http\Response.h" />
-    <ClInclude Include="..\..\..\Net\Http\V1\Connection.h" />
-    <ClInclude Include="..\..\..\Net\Http\V2\Connection.h" />
-    <ClInclude Include="..\..\..\Net\Http\V2\ErrorCode.h" />
-    <ClInclude Include="..\..\..\Net\Http\V2\Frame.h" />
-    <ClInclude Include="..\..\..\Net\Http\V2\HPack\Decoder.h" />
-    <ClInclude Include="..\..\..\Net\Http\V2\HPack\Encoder.h" />
-    <ClInclude Include="..\..\..\Net\Http\V2\HPack\HPack.h" />
-    <ClInclude Include="..\..\..\Net\Http\V2\Setting.h" />
-    <ClInclude Include="..\..\..\Net\Http\V2\Stream.h" />
-    <ClInclude Include="..\..\..\Net\Socket.h" />
-    <ClInclude Include="..\..\..\Net\SocketListener.h" />
-    <ClInclude Include="..\..\..\Net\TLSSocket.h" />
-    <ClInclude Include="..\..\..\Net\TLSSocketListener.h" />
-    <ClInclude Include="..\..\..\utility.h" />
+    <ClInclude Include="..\..\MimeType.h" />
+    <ClInclude Include="..\..\Net\Http\Connection.h" />
+    <ClInclude Include="..\..\Net\Http\Request.h" />
+    <ClInclude Include="..\..\Net\Http\Response.h" />
+    <ClInclude Include="..\..\Net\Http\V1\Connection.h" />
+    <ClInclude Include="..\..\Net\Http\V2\Connection.h" />
+    <ClInclude Include="..\..\Net\Http\V2\ErrorCode.h" />
+    <ClInclude Include="..\..\Net\Http\V2\Frame.h" />
+    <ClInclude Include="..\..\Net\Http\V2\HPack\Decoder.h" />
+    <ClInclude Include="..\..\Net\Http\V2\HPack\Encoder.h" />
+    <ClInclude Include="..\..\Net\Http\V2\HPack\HPack.h" />
+    <ClInclude Include="..\..\Net\Http\V2\Setting.h" />
+    <ClInclude Include="..\..\Net\Http\V2\Stream.h" />
+    <ClInclude Include="..\..\Net\Socket.h" />
+    <ClInclude Include="..\..\Net\SocketListener.h" />
+    <ClInclude Include="..\..\Net\TLSSocket.h" />
+    <ClInclude Include="..\..\Net\TLSSocketListener.h" />
+    <ClInclude Include="..\..\utility.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\Net\Net.def" />
+    <None Include="..\..\Net\Net.def" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
