@@ -2,6 +2,7 @@
 
 #include "../Request.h"
 #include "Frame.h"
+#include "ErrorCode.h"
 #include <cstdint>
 #include <vector>
 #include <functional>
@@ -46,6 +47,7 @@ namespace Net
 				void SetOnData(std::function<void(std::vector<uint8_t>::const_iterator & buffer, uint32_t length)> ondata);
 				void OnContinuation(Frame & frame, std::vector<uint8_t>::const_iterator & buffer, uint32_t length);
 				void SetOnContinuation(std::function<void(Frame & frame, std::vector<uint8_t>::const_iterator & buffer, uint32_t length)> ondata);
+				void ResetStream(ErrorCode code);
 			};
 		}
 	}

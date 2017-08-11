@@ -32,7 +32,7 @@ void RequestHandler(std::shared_ptr<Connection> connection)
 		{
 			auto & socket = connection->socket;
 			response.status = 200;
-			response.headerlist.push_back({ "content-length", "23" });
+			response.headerlist.insert({ "content-length", "23" });
 			connection->SendResponse();
 			connection->SendData((uint8_t*)"Http/1-2 Server Running", 23, true);
 		}
@@ -49,7 +49,7 @@ void RequestHandler(std::shared_ptr<Connection> connection)
 				{
 					uintmax_t filesize = file_size(filepath);
 					response.status = 200;
-					response.headerlist.push_back({ "content-length", std::to_string(filesize) });
+					response.headerlist.insert({ "content-length", std::to_string(filesize) });
 					connection->SendResponse();
 					{
 						std::vector<uint8_t> buffer(10240);
@@ -76,11 +76,28 @@ void RequestHandler(std::shared_ptr<Connection> connection)
 				if (connection->request.contentlength == 0)
 				{
 					connection->response.status = 200;
-					connection->response.headerlist.push_back({ "content-length", "0" });
+					connection->response.headerlist.insert({ "content-length", "0" });
 					connection->SendResponse();
 				}
 			});
 		}
+	}
+}
+
+std::shared_ptr<Net::Http::V2::Stream> GetStream(uint32_t streamidentifier, std::vector<std::shared_ptr<Net::Http::V2::Stream>> &hstreams, std::vector<std::shared_ptr<Net::Http::V2::Stream>> & rstreams)
+{
+	uint32_t id = streamidentifier >> 1;
+	if ((streamidentifier & 1) == 1)
+	{
+		if(rstreams.size() >= id)
+			rstreams.resize(id + 1);
+		return rstreams[id] ? rstreams[id] : (rstreams[id] = std::make_shared<Net::Http::V2::Stream>(streamidentifier));
+	}
+	else
+	{
+		if (hstreams.size() >= id)
+			hstreams.resize(id + 1);
+		return hstreams[id] ? hstreams[id] : (hstreams[id] = std::make_shared<Net::Http::V2::Stream>(streamidentifier));
 	}
 }
 
@@ -134,55 +151,51 @@ int main(int argc, const char** argv)
 						{
 							if (frame.streamidentifier == 0)
 								throw ErrorCode::PROTOCOL_ERROR;
-							uint32_t id = frame.streamidentifier >> 1;
-							if (rstreams.size() <= id)
+							auto stream = GetStream(frame.streamidentifier, hstreams, rstreams);
+							stream->state = frame.HasFlag(FrameFlag::END_STREAM) ? StreamState::half_closed_remote : StreamState::open;
+							if (frame.HasFlag(FrameFlag::PRIORITY))
 							{
-								rstreams.resize(id + 1);
-								auto stream = rstreams[id] = std::make_shared<Stream>(frame.streamidentifier);
-								stream->state = frame.HasFlag(FrameFlag::END_STREAM) ? StreamState::half_closed_remote : StreamState::open;
-								if (frame.HasFlag(FrameFlag::PRIORITY))
-								{
-									stream->priority.exclusive = *pos & 0x80;
-									stream->priority.dependency = GetUInt31(pos);
-									stream->priority.weight = *pos++;
-								}
-								std::shared_ptr<Net::Http::V2::Connection> connection = std::make_shared<Net::Http::V2::Connection>();
-								connection->request.DecodeHeaderblock(decoder, pos, end - pos);
-								connection->encoder = encoder;
-								connection->frame = frame;
-								connection->socket = socket;
-								connection->stream = stream;
-								if (frame.HasFlag(FrameFlag::END_HEADERS))
-								{
-									RequestHandler(connection);
-								}
-								else
-								{
-									stream->SetOnContinuation([connection, &decoder](Frame & frame, std::vector<uint8_t>::const_iterator & buffer, uint32_t length) {
-										connection->request.DecodeHeaderblock(decoder, buffer, length);
-										if (frame.HasFlag(FrameFlag::END_HEADERS))
-										{
-											RequestHandler(connection);
-										}
-									});
-								}
+								stream->priority.exclusive = *pos & 0x80;
+								stream->priority.dependency = GetUInt31(pos);
+								stream->priority.weight = *pos++;
+							}
+							std::shared_ptr<Net::Http::V2::Connection> connection = std::make_shared<Net::Http::V2::Connection>();
+							connection->request.DecodeHttp2(decoder, pos, end);
+							connection->encoder = encoder;
+							connection->frame = frame;
+							connection->socket = socket;
+							connection->stream = stream;
+							if (frame.HasFlag(FrameFlag::END_HEADERS))
+							{
+								RequestHandler(connection);
+							}
+							else
+							{
+								stream->SetOnContinuation([connection, &decoder](Frame & frame, std::vector<uint8_t>::const_iterator & buffer, uint32_t length) {
+									connection->request.DecodeHttp2(decoder, buffer, buffer + length);
+									if (frame.HasFlag(FrameFlag::END_HEADERS))
+									{
+										RequestHandler(connection);
+									}
+								});
 							}
 							break;
 						}
 						case FrameType::PRIORITY:
 						{
-							/*
-							rstreams[frame.streamidentifier >> 1]->priority.exclusive = *pos & 0x80;
-							rstreams[frame.streamidentifier >> 1]->priority.dependency = GetUInt31(pos);
-							rstreams[frame.streamidentifier >> 1]->priority.weight = *pos++;*/
-							pos += 5;
+							auto stream = GetStream(frame.streamidentifier, hstreams, rstreams);
+							stream->priority.exclusive = *pos & 0x80;
+							stream->priority.dependency = GetUInt31(pos);
+							stream->priority.weight = *pos++;
 							break;
 						}
 						case FrameType::RST_STREAM:
 						{
 							ErrorCode code = (ErrorCode)GetUInt32(pos);
-							rstreams[frame.streamidentifier >> 1]->state = StreamState::closed;
+							//rstreams[frame.streamidentifier >> 1]->state = StreamState::closed;
 							//Abort Work
+							auto stream = GetStream(frame.streamidentifier, hstreams, rstreams);
+							stream->ResetStream(code);
 							break;
 						}
 						case FrameType::SETTINGS:
@@ -272,7 +285,7 @@ int main(int argc, const char** argv)
 					if (content <= 0)
 					{
 						connection = std::make_shared<V1::Connection>();
-						connection->request = Request::ParseHttp1(buffer.data(), count);
+						connection->request.DecodeHttp1(buffer.begin(), buffer.end());
 						connection->socket = socket;
 						content = connection->request.contentlength;
 						RequestHandler(connection);

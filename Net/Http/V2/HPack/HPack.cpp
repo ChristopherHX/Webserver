@@ -67,7 +67,7 @@ const std::pair<std::string, std::string> HPack::StaticTable[61] = {
 	{ "www-authenticate" , "" }
 };
 
-const std::pair<uint32_t, uint8_t> HPack::StaticHuffmanTable[] = {
+const std::pair<uint32_t, uint8_t> HPack::StaticHuffmanTable[257] = {
 	{ 0x1ff8, 13 },
 	{ 0x7fffd8, 23 },
 	{ 0xfffffe2, 28 },

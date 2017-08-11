@@ -33,6 +33,10 @@ void Stream::SetOnContinuation(std::function<void(Frame & frame, std::vector<uin
 	_oncontinuation = oncontinuation;
 }
 
+void Stream::ResetStream(ErrorCode code)
+{
+}
+
 StreamPriority::StreamPriority()
 {
 	exclusive = false;

@@ -4,8 +4,10 @@ using namespace Net::Http::V1;
 
 void Connection::SendResponse(bool endstream)
 {
-	auto header = response.ToHttp1();
-	socket->SendAll((uint8_t*)header.data(), header.length());
+	std::vector<uint8_t> buffer(1 << 20);
+	auto end = buffer.begin();
+	response.EncodeHttp1(end);
+	socket->SendAll(buffer.data(), end - buffer.begin());
 }
 
 void Connection::SendData(const uint8_t * buffer, int length, bool endstream)

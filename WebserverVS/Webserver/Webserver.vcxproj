@@ -220,7 +220,7 @@
   <ItemGroup>
     <None Include="..\..\..\Website\css\default.css" />
     <None Include="..\..\..\Website\index.htm">
-      <DeploymentContent>true</DeploymentContent>
+      <DeploymentContent>false</DeploymentContent>
     </None>
     <None Include="..\..\..\Website\js\uploader.js" />
   </ItemGroup>

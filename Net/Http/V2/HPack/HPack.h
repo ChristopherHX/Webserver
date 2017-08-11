@@ -3,6 +3,10 @@
 #include <string>
 #include <utility>
 
+#ifndef IMPORT
+#define IMPORT  __declspec( dllimport )
+#endif
+
 namespace Net
 {
 	namespace Http
@@ -11,8 +15,8 @@ namespace Net
 		{
 			namespace HPack
 			{
-				extern const std::pair<std::string, std::string> StaticTable[61];
-				extern const std::pair<uint32_t, uint8_t> StaticHuffmanTable[];
+				IMPORT extern const std::pair<std::string, std::string> StaticTable[61];
+				IMPORT extern const std::pair<uint32_t, uint8_t> StaticHuffmanTable[257];
 			}
 		}
 	}

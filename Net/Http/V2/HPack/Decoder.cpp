@@ -2,14 +2,12 @@
 #include "HPack.h"
 #include <algorithm>
 #include <sstream>
+#include "../../Header.h"
 
 using namespace Net::Http::V2::HPack;
 
-void Decoder::DecodeHeaderblock(Net::Http::Request * request, std::vector<uint8_t>::const_iterator & pos, size_t length)
+void Decoder::DecodeHeaderblock(Net::Http::Header * request, std::vector<uint8_t>::const_iterator & pos, const std::vector<uint8_t>::const_iterator & end)
 {
-	static std::hash<std::string> hash_fn;
-	static const size_t path = hash_fn(":path"), authority = hash_fn(":authority"), scheme = hash_fn(":scheme"), method = hash_fn(":method"), status = hash_fn(":status");
-	auto end = pos + length;
 	while (pos != end)
 	{
 		if ((*pos & 0x80) != 0)
@@ -19,34 +17,7 @@ void Decoder::DecodeHeaderblock(Net::Http::Request * request, std::vector<uint8_
 			{
 				throw std::runtime_error("Compressionsfehler invalid index");
 			}
-			auto & el = index < 62 ? StaticTable[index - 1] : *(dynamictable.end() - (index - 61));
-			{
-				size_t hash = hash_fn(el.first);
-				if (hash == path)
-				{
-					request->ParseUri(el.second);
-				}
-				else if(hash == authority)
-				{
-					request->authority = el.second;
-				}
-				else if(hash == scheme)
-				{
-					request->scheme = el.second;
-				}
-				else if (hash == method)
-				{
-					request->method = el.second;
-				}
-				//else if (hash == status)
-				//{
-				//	request->status = el.second;
-				//}
-				else
-				{
-					request->headerlist.insert(el);
-				}
-			}
+			request->Add(index < 62 ? StaticTable[index - 1] : *(dynamictable.end() - (index - 61)));
 		}
 		else if ((*pos & 0x40) != 0)
 		{
@@ -73,7 +44,7 @@ void Decoder::DecodeHeaderblock(Net::Http::Request * request, std::vector<uint8_
 			{
 				throw std::runtime_error("Compressionsfehler");
 			}
-			headerlist.push_back({ key, value });
+			request->Add({ key, value });
 			dynamictable.push_back({ key, value });
 		}
 		else if ((*pos & 0x20) != 0)
@@ -105,7 +76,7 @@ void Decoder::DecodeHeaderblock(Net::Http::Request * request, std::vector<uint8_
 			{
 				throw std::runtime_error("Compressionsfehler");
 			}
-			headerlist.push_back({ key, value });
+			request->Add({ key, value });
 		}
 		else
 		{
@@ -132,7 +103,7 @@ void Decoder::DecodeHeaderblock(Net::Http::Request * request, std::vector<uint8_
 			{
 				throw std::runtime_error("Compressionsfehler");
 			}
-			headerlist.push_back({ key, value });
+			request->Add({ key, value });
 		}
 		if (pos > end)
 		{

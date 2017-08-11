@@ -5,42 +5,8 @@
 
 using namespace Net::Http;
 
-Request Request::ParseHttp1(const uint8_t * buffer, int length)
-{
-	Request request;
-	const uint8_t * ofl = buffer;
-	const uint8_t * ofr = (const uint8_t *)memchr(ofl, ' ', length - (ofl - buffer));
-	request.method = std::string(ofl, ofr);
-	ofl = ofr + 1;
-	ofr = (const uint8_t *)memchr(ofl, ' ', length - (ofl - buffer));
-	std::string path(ofl, ofr);
-	ofl = ofr + 1;
-	ofr = (const uint8_t *)memchr(ofl, '\r', length - (ofl - buffer));
-	request.ParseUri(path);
-	request.headerlist.push_back({ ":method", request.method });
-	request.headerlist.push_back({ ":path", path });
-	while (ofr + 2 < buffer + length)
-	{
-		ofl = ofr + 2;
-		ofr = (const uint8_t *)memchr(ofl, '\r', length - (ofl - buffer));
-		const uint8_t * sep = (const uint8_t *)memchr(ofl, ':', length - (ofl - buffer));
-		if (sep != nullptr && sep < ofr)
-		{
-			std::string key(ofl, sep);
-			std::transform(key.begin(), key.end(), key.begin(), ::tolower);
-			if (std::find_if(request.headerlist.begin(), request.headerlist.end(), [&key](const std::pair<std::string, std::string> & pair) {return pair.first == key; }) == request.headerlist.end())
-				request.headerlist.push_back({ key, std::string(sep + 2, ofr) });
-		}
-	}
-	for (auto & entry : request.headerlist)
-	{
-		if (entry.first == "content-length")
-		{
-			request.contentlength = std::stoll(entry.second);
-		}
-	}
-	return request;
-}
+size_t hmethod = Net::Http::Header::hash_fn(":method");
+size_t hpath = Net::Http::Header::hash_fn(":path");
 
 void Request::ParseUri(const std::string & uri)
 {
@@ -59,26 +25,32 @@ void Request::ParseUri(const std::string & uri)
 	}
 }
 
-void Net::Http::Request::DecodeHeaderblock(std::shared_ptr<V2::HPack::Decoder>& decoder, std::vector<uint8_t>::const_iterator & buffer, int length)
+bool Net::Http::Request::Add(size_t hash, const std::pair<std::string, std::string>& pair)
 {
-	decoder->DecodeHeaderblock(this, buffer, length, headerlist);
-	for (auto & entry : headerlist)
+	if (hash == hmethod)
 	{
-		if (entry.first == ":method")
-		{
-			method = entry.second;
-		}
-		else if (entry.first == ":path")
-		{
-			ParseUri(entry.second);
-		}
-		else if (entry.first == "content-length")
-		{
-			this->contentlength = std::stoll(entry.second);
-		}
-		else if (entry.first == "content-type")
-		{
-			this->contenttype = entry.second;
-		}
+		method = pair.second;
 	}
+	else if (hash == hpath)
+	{
+		ParseUri(pair.second);
+	}
+	else
+	{
+		return false;
+	}
+	return true;
+}
+
+void Net::Http::Request::DecodeHttp1(std::vector<uint8_t>::const_iterator & buffer, const std::vector<uint8_t>::const_iterator & end)
+{
+	std::vector<uint8_t>::const_iterator ofr = std::find(buffer, end, ' ');
+	method = std::string(buffer, ofr);
+	buffer = ofr + 1;
+	ofr = std::find(buffer, end, ' ');
+	ParseUri(std::string(buffer, ofr));
+	buffer = ofr + 1;
+	const char rn[] = "\r\n";
+	buffer = std::search(buffer, end, rn, std::end(rn)) + 2;
+	Header::DecodeHttp1(buffer, end);
 }

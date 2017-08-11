@@ -1,8 +1,15 @@
 #pragma once
-#include "../../Request.h"
 #include <cstdint>
 #include <vector>
 #include <string>
+
+namespace Net
+{
+	namespace Http
+	{
+		class Header;
+	}
+}
 
 namespace Net
 {
@@ -17,7 +24,7 @@ namespace Net
 				private:
 					std::vector<std::pair<std::string, std::string>> dynamictable;
 				public:
-					void DecodeHeaderblock(Net::Http::Request * request, std::vector<uint8_t>::const_iterator & pos, size_t length);
+					void DecodeHeaderblock(Net::Http::Header * request, std::vector<uint8_t>::const_iterator & pos, const std::vector<uint8_t>::const_iterator & end);
 
 					static uint64_t DecodeInteger(std::vector<uint8_t>::const_iterator & pos, uint8_t bits);
 

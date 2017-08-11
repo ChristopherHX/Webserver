@@ -1,6 +1,8 @@
 #pragma once
 #include "../Socket.h"
+#include "Header.h"	
 #include "V2/HPack/Decoder.h"
+#include "Header.h"
 #include <string>
 #include <memory>
 #include <unordered_map>
@@ -10,21 +12,16 @@ namespace Net
 {
 	namespace Http
 	{
-		class Request
+		class Request : public Header
 		{
 		public:
-			static Request ParseHttp1(const uint8_t * buffer, int length);
 			void ParseUri(const std::string &path);
-			void DecodeHeaderblock(std::shared_ptr<V2::HPack::Decoder> & decoder, std::vector<uint8_t>::const_iterator & buffer, int length);
 			std::string method;
 			std::string uri;
 			std::string path;
 			std::string query;
-			std::string contenttype;
-			uintmax_t contentlength;
-			std::string scheme;
-			std::string authority;
-			std::unordered_map<std::string, std::string> headerlist;
+			bool Add(size_t hash, const std::pair<std::string, std::string> & pair) override;
+			void DecodeHttp1(std::vector<uint8_t>::const_iterator & buffer, const std::vector<uint8_t>::const_iterator & end) override;
 		};
 	}
 }

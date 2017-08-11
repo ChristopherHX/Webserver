@@ -1,16 +1,23 @@
 #pragma once
 #include "V2/HPack/Encoder.h"
+#include "Header.h"
 #include <sstream>
 #include <string>
 #include <vector>
 #include <memory>
 
-class Response
+namespace Net
 {
-public:
-	int status;
-	std::vector<std::pair<std::string, std::string>> headerlist;
-	std::string ToHttp1Upper(const std::string & source);
-	std::string ToHttp1();
-	std::vector<uint8_t> ToHttp2(std::shared_ptr<Net::Http::V2::HPack::Encoder> & encoder);
-};
+	namespace Http
+	{
+		class Response : public Header
+		{
+		public:
+			int status;
+			Response();
+			bool Add(size_t hash, const std::pair<std::string, std::string> & pair) override;
+			void EncodeHttp1(std::vector<uint8_t>::iterator & buffer) override;
+			void EncodeHttp2(std::shared_ptr<Net::Http::V2::HPack::Encoder> & encoder, std::vector<uint8_t>::iterator & buffer) override;
+		};
+	}
+}

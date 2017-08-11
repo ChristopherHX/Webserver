@@ -6,14 +6,16 @@ using namespace Net::Http::V2;
 
 void Connection::SendResponse(bool endstream)
 {
-	auto body = response.ToHttp2(encoder);
+	std::vector<uint8_t> buffer(1 << 20);
+	auto end = buffer.begin();
+	response.EncodeHttp2(encoder, end);
 	Frame result;
-	result.length = body.size();
+	result.length = end - buffer.begin();
 	result.type = FrameType::HEADERS;
 	result.flags = (FrameFlag)((uint8_t)FrameFlag::END_HEADERS | (endstream ? (uint8_t)FrameFlag::END_STREAM : 0));
 	result.streamidentifier = frame.streamidentifier;
 	socket->SendAll(result.ToArray());
-	socket->SendAll(body.data(), body.size());
+	socket->SendAll(buffer.data(), result.length);
 }
 
 void Connection::SendData(const uint8_t* buffer, int length, bool endstream)

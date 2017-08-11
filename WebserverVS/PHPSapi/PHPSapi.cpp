@@ -71,7 +71,7 @@ static void sapi_phprun_flush(void *server_context)
 static int sapi_phprun_send_headers(sapi_headers_struct *sapi_headers)
 {
 	auto &client = *(PHPClientData*)SG(server_context);
-	std::vector<std::pair<std::string, std::string>> &headerlist = client.con->response.headerlist;
+	auto &headerlist = client.con->response.headerlist;
 	client.con->response.status = sapi_headers->http_response_code == 0 ? 200 : sapi_headers->http_response_code;
 	//headerlist.push_back({ ":status", sapi_headers->http_response_code == 0 ? "200" : std::to_string(sapi_headers->http_response_code) });
 	{
@@ -84,7 +84,7 @@ static int sapi_phprun_send_headers(sapi_headers_struct *sapi_headers)
 				int l = *(res + 1) == ' ' ? 2 : 1;
 				std::string key(sapi_header->header, res);
 				std::transform(key.begin(), key.end(), key.begin(), tolower);
-				headerlist.push_back({ key, std::string(res + l, sapi_header->header + sapi_header->header_len) });
+				headerlist.insert({ key, std::string(res + l, sapi_header->header + sapi_header->header_len) });
 				sapi_header = (sapi_header_struct *)zend_llist_get_next(&sapi_headers->headers);
 			}
 		}
@@ -205,14 +205,13 @@ void PHPSapi::requesthandler(std::shared_ptr<Net::Http::Connection> connection)
 			std::cout << "module nicht gestartet" << "\n";
 			return;
 		}
-		ts_free_id(resources - 1);
+		//ts_free_id(resources - 1);
 
 	}
 #endif
 	{
 		zend_file_handle file_handle;
-		PHPClientData info;
-		info.con = connection;
+		PHPClientData info = { connection };
 		std::string phpfilestring = phpfile.u8string();
 		file_handle.type = ZEND_HANDLE_FILENAME;
 		file_handle.filename = (char *)phpfilestring.c_str();
