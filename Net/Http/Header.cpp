@@ -32,7 +32,7 @@ bool Net::Http::Header::Add(size_t hash, const std::pair<std::string, std::strin
 	}
 	else if (hash == hcontentlength)
 	{
-		contenttype = pair.second;
+		contentlength = std::stoull(pair.second);
 	}
 	else
 	{
@@ -41,7 +41,7 @@ bool Net::Http::Header::Add(size_t hash, const std::pair<std::string, std::strin
 	return true;
 }
 
-void Net::Http::Header::EncodeHttp1(std::vector<uint8_t>::iterator & buffer)
+void Net::Http::Header::EncodeHttp1(std::vector<uint8_t>::iterator & buffer) const
 {
 	for (auto &entry : headerlist)
 	{
@@ -52,7 +52,7 @@ void Net::Http::Header::EncodeHttp1(std::vector<uint8_t>::iterator & buffer)
 	buffer = std::copy(nl, std::end(nl), buffer);
 }
 
-void Net::Http::Header::EncodeHttp2(std::shared_ptr<Net::Http::V2::HPack::Encoder> &encoder, std::vector<uint8_t>::iterator & buffer)
+void Net::Http::Header::EncodeHttp2(std::shared_ptr<Net::Http::V2::HPack::Encoder> encoder, std::vector<uint8_t>::iterator & buffer) const
 {
 	std::vector<std::pair<std::string, std::string>> el;
 	if(!scheme.empty())
@@ -60,9 +60,9 @@ void Net::Http::Header::EncodeHttp2(std::shared_ptr<Net::Http::V2::HPack::Encode
 	if (!authority.empty())
 		el.push_back({ ":authority", authority });
 	if (!contenttype.empty())
-		el.push_back({ ":content-type", contenttype });
+		el.push_back({ "content-type", contenttype });
 	if(contentlength != 0)
-		el.push_back({ ":content-length", std::to_string(contentlength) });
+		el.push_back({ "content-length", std::to_string(contentlength) });
 	encoder->AddHeaderBlock(buffer, el);
 	encoder->AddHeaderBlock(buffer, headerlist);
 }
@@ -85,7 +85,7 @@ void Net::Http::Header::DecodeHttp1(std::vector<uint8_t>::const_iterator & buffe
 	}
 }
 
-void Net::Http::Header::DecodeHttp2(std::shared_ptr<Net::Http::V2::HPack::Decoder>& decoder, std::vector<uint8_t>::const_iterator & buffer, const std::vector<uint8_t>::const_iterator & end)
+void Net::Http::Header::DecodeHttp2(std::shared_ptr<Net::Http::V2::HPack::Decoder> decoder, std::vector<uint8_t>::const_iterator & buffer, const std::vector<uint8_t>::const_iterator & end)
 {
 	decoder->DecodeHeaderblock(this, buffer, end);
 }

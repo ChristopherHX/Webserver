@@ -1,145 +1,147 @@
-﻿#include <Http/HttpServer.h>
-#include <Http/Http2.h>
-#include <experimental/filesystem>
-#include <iostream>
-#include <string>
-#include <fstream>
+#include "../Net/TLSSocketListener.h"
+#include "../Net/Http/V2/Frame.h"
+#include "../Net/Http/V2/HPack/Encoder.h"
+#include "../Net/Http/V2/HPack/Decoder.h"
+#include "../Net/Http/V2/Setting.h"
+#include "../Net/Http/V2/Stream.h"
+#include "../Net/Http/V2/ErrorCode.h"
+#include "../Net/Http/V2/Connection.h"
+#include "../Net/Http/V1/Connection.h"
+#include "../Net/Http/V2/Session.h"
+//#include "../PHPSapi/PHPSapi.h"
+
+#include <unordered_map>
+#include <algorithm>
 #include <vector>
-#include <condition_variable>
+#include <memory>
+#include <fstream>
+#include <iostream>
+#include <cstdint>
 
-#ifdef _WIN32
-#include <Windows.h>
-#else
-#include <unistd.h>
-#endif
+#include <experimental/filesystem>
+using namespace Net::Http;
+using namespace std::experimental::filesystem;
 
-std::condition_variable controlc;
-
-void handle_ctrlc_signal(int sig)
-{
-	controlc.notify_all();
-	return;
-}
-
-#ifdef _WIN32
-BOOL windows_ctrl_handler(DWORD fdwCtrlType)
-{
-	switch (fdwCtrlType)
-	{
-	case CTRL_C_EVENT:
-		handle_ctrlc_signal(0);
-		return TRUE;
-	case CTRL_BREAK_EVENT:
-	case CTRL_CLOSE_EVENT:
-	case CTRL_LOGOFF_EVENT:
-	case CTRL_SHUTDOWN_EVENT:
-		break;
-	}
-	return FALSE;
-}
-#endif
-
-namespace fs = std::experimental::filesystem;
+//void RequestHandler(std::shared_ptr<Connection> connection)
+//{
+//	auto & request = connection->request;
+//	auto & response = connection->response;
+//	std::vector<uint8_t> buffer;
+//	if (request.method == "GET")
+//	{
+//		if (request.path == "/status.html")
+//		{
+//			auto & socket = connection->socket;
+//			response.status = 200;
+//			response.headerlist.insert({ "content-length", "23" });
+//			connection->SendResponse();
+//			connection->SendData((uint8_t*)"Http/1-2 Server Running", 23, true);
+//		}
+//		else
+//		{
+//			path filepath = L"D:\\Web" / request.path;
+//			if (is_regular_file(filepath))
+//			{
+//				if (filepath.extension() == ".php")
+//				{
+//					PHPSapi::requesthandler(connection);
+//				}
+//				else
+//				{
+//					uintmax_t filesize = file_size(filepath);
+//					response.status = 200;
+//					response.headerlist.insert({ "content-length", std::to_string(filesize) });
+//					connection->SendResponse();
+//					{
+//						std::vector<uint8_t> buffer(10240);
+//						std::ifstream filestream(filepath, std::ios::binary);
+//						for (uintmax_t i = filesize; i > 0;)
+//						{
+//							int count = std::min((uintmax_t)buffer.size(), i);
+//							filestream.read((char*)buffer.data(), count);
+//							connection->SendData(buffer.data(), count, count == i);
+//							i -= count;
+//						}
+//					}
+//				}
+//			}
+//		}
+//	}
+//	else
+//	{
+//		if (request.path == "/upload")
+//		{
+//			connection->SetOnData([connection](std::vector<uint8_t>::const_iterator & buffer, uint32_t length) {
+//				std::cout << "-------------------------------\n" << std::string((char*)&buffer[0], length) << "-------------------------------\n";
+//				connection->request.contentlength -= length;
+//				if (connection->request.contentlength == 0)
+//				{
+//					connection->response.status = 200;
+//					connection->response.headerlist.insert({ "content-length", "0" });
+//					connection->SendResponse();
+//				}
+//			});
+//		}
+//	}
+//}
 
 int main(int argc, const char** argv)
 {
-#ifdef _WIN32
-	auto _cicp = GetConsoleCP(), _cocp = GetConsoleOutputCP();
-	SetConsoleCP(CP_UTF8);
-	SetConsoleOutputCP(CP_UTF8);
-#endif
-#ifndef _WIN32
-	signal(SIGINT, handle_ctrlc_signal);
-#else
-	SetConsoleCtrlHandler((PHANDLER_ROUTINE)windows_ctrl_handler, TRUE);
-#endif
-	try
-	{
-		int cmd = 0;
-		fs::path executablefolder = fs::canonical(fs::path(*argv++).parent_path()), privatekey = executablefolder / "privkey.pem", publiccertificate = executablefolder / "publicchain.pem", webroot = executablefolder;
-		--argc;
-		while (argc > 0)
+	Net::TLSSocketListener listener;
+	listener.SetConnectionHandler([](std::shared_ptr<Net::Socket> socket) {
+		if (socket->GetProtocol() == "h2")
 		{
-			if (strcmp(*argv, "-help") == 0)
+			using namespace V2;
+			try
 			{
-				++argv;
-				--argc;
-				cmd = 0;
+				auto session = std::make_shared<V2::Session>(socket);
+				session->Start();
 			}
-			else if (strcmp(*argv, "-h1") == 0)
+			catch (const std::runtime_error & error)
 			{
-				++argv;
-				--argc;
-				cmd = 1;
-			}
-			else if (strcmp(*argv, "-h2") == 0)
-			{	
-				++argv;
-				--argc;
-				cmd = 2;
-			}
-			else if (strcmp(*argv, "-prikey") == 0)
-			{
-				++argv;
-				privatekey = *argv++;
-				argc -= 2;
-			}
-			else if (strcmp(*argv, "-pubcert") == 0)
-			{
-				++argv;
-				publiccertificate = *argv++;
-				argc -= 2;
-			}
-			else if (strcmp(*argv, "-webroot") == 0)
-			{
-				++argv;
-				webroot = *argv++;
-				argc -= 2;
-			}
-			else
-			{
-				throw std::runtime_error("Unbekanntes Argument \"" + std::string(*argv) + "\"");
+				std::cout << error.what() << "\n";
 			}
 		}
-		switch (cmd)
-		{
-		case 1:
-		{
-			std::mutex wait;
-			std::unique_lock<std::mutex> lock(wait);
-			Http::Server server(privatekey, publiccertificate, webroot);
-			std::cout << "Webserver gestartet\n";
-			controlc.wait(lock);
-			std::cout << "Webserver beendet\n";
-			break;
-		}
-		case 2:
-		{
-			std::mutex wait;
-			std::unique_lock<std::mutex> lock(wait);
-			Http2::Server server(privatekey, publiccertificate, webroot);
-			std::cout << "Webserver gestartet\n";
-			controlc.wait(lock);
-			std::cout << "Webserver beendet\n";
-			break;
-		}
-		default:
-			std::cout << "Benutzung vom Server\n";
-			std::cout << "-help Zeige diese Hilfe\n";
-			std::cout << "-h1 HTTP/1.1 Server\n";
-			std::cout << "-h2 HTTP/2.0 Server\n";
-			std::cout << "-prikey <pfad> privater Schlüssel\n";
-			std::cout << "-pubcert <pfad> öffentliches Zertifikat\n";
-			std::cout << "-webroot <pfad> Webroot\n";
-			break;
-		}
-	}
-	catch (std::exception &ex) {
-		std::cout << "Fehler:" << ex.what() << "\r\n";
-	}
-#ifdef _WIN32
-	SetConsoleCP(_cicp);
-	SetConsoleOutputCP(_cocp);
-#endif
+		//else
+		//{
+		//	int content = 0;
+		//	std::shared_ptr<V1::Connection> connection;
+		//	while (true)
+		//	{
+		//		int count = socket->Receive(buffer.data(), content == 0 ? buffer.size() : std::min(content, (int)buffer.size()));
+		//		if (count > 0)
+		//		{
+		//			if (content <= 0)
+		//			{
+		//				connection = std::make_shared<V1::Connection>();
+		//				connection->request.DecodeHttp1(buffer.begin(), buffer.end());
+		//				connection->socket = socket;
+		//				content = connection->request.contentlength;
+		//				RequestHandler(connection);
+		//			}
+		//			else
+		//			{
+		//				content -= count;
+		//				connection->OnData(buffer.begin(), count);
+		//			}
+		//		}
+		//		else
+		//		{
+		//			break;
+		//		}
+		//	}
+		//}
+	});
+	listener.UsePrivateKey("D:\\Users\\administrator\\Documents\\privatekey.pem", Net::SSLFileType::PEM);
+	listener.UseCertificate("D:\\Users\\administrator\\Documents\\certificate.cer", Net::SSLFileType::PEM);
+	auto address = std::make_shared<sockaddr_in6>();
+	memset(address.get(), 0, sizeof(sockaddr_in6));
+	address->sin6_family = AF_INET6;
+	address->sin6_port = htons(443);
+	address->sin6_addr = in6addr_any;
+	listener.AddProtocol("h2");
+	//PHPSapi::init();
+	listener.Listen(std::shared_ptr<sockaddr>(address, (sockaddr*)address.get()), sizeof(sockaddr_in6))->join();
+	//PHPSapi::deinit();
 	return 0;
 }

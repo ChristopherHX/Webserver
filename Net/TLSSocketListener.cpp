@@ -23,7 +23,7 @@ TLSSocketListener::~TLSSocketListener()
 	OPENSSL_cleanup();
 }
 
-void TLSSocketListener::AddProtocol(std::string proto)
+void TLSSocketListener::AddProtocol(const std::string &proto)
 {
 	protocols += (char)proto.length() + proto;
 }

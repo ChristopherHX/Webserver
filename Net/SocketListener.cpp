@@ -1,6 +1,9 @@
 #include "SocketListener.h"
 #include <stdexcept>
 #include <string>
+#ifndef _WIN32
+#include <netinet/tcp.h>
+#endif
 
 using namespace Net;
 

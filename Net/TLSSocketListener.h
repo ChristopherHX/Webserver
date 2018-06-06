@@ -23,7 +23,7 @@ namespace Net
 	public:
 		TLSSocketListener();
 		~TLSSocketListener();
-		void AddProtocol(std::string proto);
+		void AddProtocol(const std::string &proto);
 		const std::string & GetProtocols();
 		bool UsePrivateKey(const std::string & privatekey, SSLFileType ftype);
 		bool UsePrivateKey(const uint8_t * buffer, int length, SSLFileType ftype);

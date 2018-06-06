@@ -17,7 +17,7 @@ void Decoder::DecodeHeaderblock(Net::Http::Header * request, std::vector<uint8_t
 			{
 				throw std::runtime_error("Compressionsfehler invalid index");
 			}
-			request->Add(index < 62 ? StaticTable[index - 1] : *(dynamictable.end() - (index - 61)));
+			request->Add(index < 62 ? StaticTable[index - 1] : *(dynamictable.end() - (ptrdiff_t)(index - 61)));
 		}
 		else if ((*pos & 0x40) != 0)
 		{
@@ -33,7 +33,7 @@ void Decoder::DecodeHeaderblock(Net::Http::Header * request, std::vector<uint8_t
 				{
 					throw std::runtime_error("Compressionsfehler invalid index");
 				}
-				key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictable.end() - (index - 61))).first;
+				key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictable.end() - (ptrdiff_t)(index - 61))).first;
 			}
 			if (key.empty())
 			{
@@ -65,7 +65,7 @@ void Decoder::DecodeHeaderblock(Net::Http::Header * request, std::vector<uint8_t
 				{
 					throw std::runtime_error("Compressionsfehler invalid index");
 				}
-				key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictable.end() - (index - 61))).first;
+				key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictable.end() - (ptrdiff_t)(index - 61))).first;
 			}
 			if (key.empty())
 			{
@@ -92,7 +92,7 @@ void Decoder::DecodeHeaderblock(Net::Http::Header * request, std::vector<uint8_t
 				{
 					throw std::runtime_error("Compressionsfehler invalid index");
 				}
-				key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictable.end() - (index - 61))).first;
+				key = (index < 62 ? HPack::StaticTable[index - 1] : *(dynamictable.end() - (ptrdiff_t)(index - 61))).first;
 			}
 			if (key.empty())
 			{
@@ -129,7 +129,7 @@ uint64_t Decoder::DecodeInteger(std::vector<uint8_t>::const_iterator & pos, uint
 	return number;
 }
 
-std::string Decoder::DecodeHuffmanString(std::vector<uint8_t>::const_iterator & pos, long long length)
+std::string Decoder::DecodeHuffmanString(std::vector<uint8_t>::const_iterator & pos, ptrdiff_t length)
 {
 	std::ostringstream strs;
 	long long  i = 0, blength = length << 3;
@@ -145,7 +145,7 @@ std::string Decoder::DecodeHuffmanString(std::vector<uint8_t>::const_iterator & 
 			return entry.first == (buffer >> (32 - entry.second));
 		});
 		pos += (i % 8 + res->second) >> 3;
-		if ((i += res->second) > blength | res >= (StaticHuffmanTable + 255))
+		if (((i += res->second) > blength) || (res >= (StaticHuffmanTable + 255)))
 		{
 			pos = end;
 			return strs.str();
@@ -157,7 +157,7 @@ std::string Decoder::DecodeHuffmanString(std::vector<uint8_t>::const_iterator & 
 std::string Decoder::DecodeString(std::vector<uint8_t>::const_iterator & pos)
 {
 	bool huffmanencoding = (*pos & 0x80) == 0x80;
-	uint64_t length = DecodeInteger(pos, 7);
+	ptrdiff_t length = (ptrdiff_t)DecodeInteger(pos, 7);
 	if (huffmanencoding)
 	{
 		return DecodeHuffmanString(pos, length);

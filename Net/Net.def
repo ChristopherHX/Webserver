@@ -14,9 +14,6 @@ EXPORTS
 ?GetUInt31@@YAIAAV?$_Vector_const_iterator@V?$_Vector_val@U?$_Simple_types@E@std@@@std@@@std@@@Z
 ??0Frame@V2@Http@Net@@QAA@XZ
 ??0Frame@V2@Http@Net@@QAA@AAV?$_Vector_const_iterator@V?$_Vector_val@U?$_Simple_types@E@std@@@std@@@std@@@Z
-?HasFlag@Frame@V2@Http@Net@@QAA_NW4FrameFlag@234@@Z
-?ToArray@Frame@V2@Http@Net@@QAA?AV?$vector@EV?$allocator@E@std@@@std@@XZ
-??0Stream@V2@Http@Net@@QAA@I@Z
 ?OnData@Stream@V2@Http@Net@@QAAXAAV?$_Vector_const_iterator@V?$_Vector_val@U?$_Simple_types@E@std@@@std@@@std@@I@Z
 ?OnContinuation@Stream@V2@Http@Net@@QAAXAAUFrame@234@AAV?$_Vector_const_iterator@V?$_Vector_val@U?$_Simple_types@E@std@@@std@@@std@@I@Z
 ?SetOnContinuation@Stream@V2@Http@Net@@QAAXV?$function@$$A6AXAAUFrame@V2@Http@Net@@AAV?$_Vector_const_iterator@V?$_Vector_val@U?$_Simple_types@E@std@@@std@@@std@@I@Z@std@@@Z
@@ -33,9 +30,7 @@ EXPORTS
 ?AddUInt32@@YAXIAAV?$_Vector_iterator@V?$_Vector_val@U?$_Simple_types@E@std@@@std@@@std@@@Z
 ?DecodeHttp1@Request@Http@Net@@UAAXAAV?$_Vector_const_iterator@V?$_Vector_val@U?$_Simple_types@E@std@@@std@@@std@@ABV45@@Z
 ?Add@Request@Http@Net@@UAA_NIABU?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@@Z
-?DecodeHttp2@Header@Http@Net@@UAAXAAV?$shared_ptr@VDecoder@HPack@V2@Http@Net@@@std@@AAV?$_Vector_const_iterator@V?$_Vector_val@U?$_Simple_types@E@std@@@std@@@5@ABV65@@Z
 ?DecodeHttp1@Header@Http@Net@@UAAXAAV?$_Vector_const_iterator@V?$_Vector_val@U?$_Simple_types@E@std@@@std@@@std@@ABV45@@Z
-?EncodeHttp2@Header@Http@Net@@UAAXAAV?$shared_ptr@VEncoder@HPack@V2@Http@Net@@@std@@AAV?$_Vector_iterator@V?$_Vector_val@U?$_Simple_types@E@std@@@std@@@5@@Z
-?EncodeHttp1@Header@Http@Net@@UAAXAAV?$_Vector_iterator@V?$_Vector_val@U?$_Simple_types@E@std@@@std@@@std@@@Z
 ?Add@Header@Http@Net@@UAA_NIABU?$pair@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@@std@@@Z
 ??0Response@Http@Net@@QAA@XZ
+?Start@Session@V2@Http@Net@@QAAXXZ

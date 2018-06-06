@@ -81,10 +81,10 @@ namespace Net
 							integer -= mask;
 							while (integer >= 0x80)
 							{
-								*buffer++ = (integer % 0x80) | 0x80;
+								*buffer++ = (uint8_t)((integer % 0x80) | 0x80);
 								integer >>= 7;
 							}
-							*buffer++ = integer;
+							*buffer++ = (uint8_t)integer;
 						}
 					}
 

@@ -32,6 +32,9 @@
     <ClInclude Include="Webserver.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\Website\index.htm">
@@ -43,5 +46,10 @@
     <None Include="..\..\..\Website\js\uploader.js">
       <Filter>Quelldateien\Website\js</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Webserver.rc">
+      <Filter>Ressourcendateien</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

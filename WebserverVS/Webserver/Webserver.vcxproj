@@ -215,6 +215,7 @@
     <ClCompile Include="Webserver.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="resource.h" />
     <ClInclude Include="Webserver.h" />
   </ItemGroup>
   <ItemGroup>
@@ -228,9 +229,9 @@
     <ProjectReference Include="..\Net\Net.vcxproj">
       <Project>{4e3228b4-9e9c-4599-803a-aff5b8dc9935}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\PHPSapi\PHPSapi.vcxproj">
-      <Project>{df6887ea-2253-4312-a867-ed84102ef473}</Project>
-    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Webserver.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -28,7 +28,7 @@ namespace Net
 
 					static uint64_t DecodeInteger(std::vector<uint8_t>::const_iterator & pos, uint8_t bits);
 
-					static std::string DecodeHuffmanString(std::vector<uint8_t>::const_iterator & pos, long long length);
+					static std::string DecodeHuffmanString(std::vector<uint8_t>::const_iterator & pos, ptrdiff_t length);
 
 					static std::string DecodeString(std::vector<uint8_t>::const_iterator & pos);
 				};

@@ -62,6 +62,7 @@
     <ClCompile Include="..\..\Net\Http\Header.cpp">
       <Filter>Net\Http</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Net\Http\V2\Session.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Net\TLSSocket.h">
@@ -119,6 +120,12 @@
     </ClInclude>
     <ClInclude Include="..\..\Net\Http\Header.h">
       <Filter>Net\Http</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Net\Http\Session.h">
+      <Filter>Net\Http</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Net\Http\V2\Session.h">
+      <Filter>Net\Http\V2</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

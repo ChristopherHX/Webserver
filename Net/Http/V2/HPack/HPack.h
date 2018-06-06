@@ -3,8 +3,10 @@
 #include <string>
 #include <utility>
 
-#ifndef IMPORT
+#if !defined(IMPORT) && defined(_WIN32)
 #define IMPORT  __declspec( dllimport )
+#else
+#define IMPORT
 #endif
 
 namespace Net

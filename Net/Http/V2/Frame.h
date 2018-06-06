@@ -46,8 +46,8 @@ namespace Net
 				uint32_t streamidentifier;
 				Frame();
 				Frame(std::vector<uint8_t>::const_iterator & buffer);
-				bool HasFlag(FrameFlag flag);
-				std::vector<uint8_t> ToArray();
+				bool HasFlag(FrameFlag flag) const;
+				std::vector<uint8_t> ToArray() const;
 			};
 		}
 	}

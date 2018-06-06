@@ -33,8 +33,10 @@ std::mutex phpsync;
 
 struct PHPClientData
 {
-	std::shared_ptr<Net::Http::Connection> con;
-	//Stream& stream;
+	std::shared_ptr<Net::Http::V2::Session> session;
+	std::shared_ptr<Net::Http::V2::Stream> stream;
+	std::shared_ptr<Net::Http::Request> request;
+	Response response;
 	std::unordered_map<std::string, std::string> env;
 };
 
@@ -59,7 +61,7 @@ static size_t sapi_phprun_ub_write(const char *str, size_t str_length)
 		return 0;
 	}
 	auto &client = *(PHPClientData*)SG(server_context);
-	client.con->SendData((uint8_t*)str, str_length);
+	client.session->SendData(client.stream, (uint8_t*)str, str_length, false);
 	return str_length;
 }
 
@@ -71,8 +73,8 @@ static void sapi_phprun_flush(void *server_context)
 static int sapi_phprun_send_headers(sapi_headers_struct *sapi_headers)
 {
 	auto &client = *(PHPClientData*)SG(server_context);
-	auto &headerlist = client.con->response.headerlist;
-	client.con->response.status = sapi_headers->http_response_code == 0 ? 200 : sapi_headers->http_response_code;
+	auto &headerlist = client.response.headerlist;
+	client.response.status = sapi_headers->http_response_code == 0 ? 200 : sapi_headers->http_response_code;
 	//headerlist.push_back({ ":status", sapi_headers->http_response_code == 0 ? "200" : std::to_string(sapi_headers->http_response_code) });
 	{
 		sapi_header_struct * sapi_header = (sapi_header_struct *)zend_llist_get_first(&sapi_headers->headers);
@@ -89,7 +91,7 @@ static int sapi_phprun_send_headers(sapi_headers_struct *sapi_headers)
 			}
 		}
 	}
-	client.con->SendResponse();
+	client.session->SendResponse(client.stream, client.response, false);
 	return SAPI_HEADER_SENT_SUCCESSFULLY;
 }
 
@@ -102,8 +104,8 @@ static size_t sapi_phprun_read_post(char *buf, size_t count_bytes)
 static char* sapi_phprun_read_cookies(void)
 {
 	auto &client = *(PHPClientData*)SG(server_context);
-	auto res = std::find_if(client.con->request.headerlist.begin(), client.con->request.headerlist.end(), [](const std::pair<std::string, std::string> & pair) { return pair.first == "cookie"; });
-	if (res != client.con->request.headerlist.end())
+	auto res = client.request->headerlist.lower_bound("cookie");
+	if (res != client.request->headerlist.end())
 	{
 		return (char*)res->second.data();
 	}
@@ -186,59 +188,62 @@ void PHPSapi::deinit()
 	tsrm_shutdown();
 #endif
 }
+
 #ifdef ZTS
 int resources = 0;
 #endif
 
-void PHPSapi::requesthandler(std::shared_ptr<Net::Http::Connection> connection)
+void PHPSapi::requesthandler(std::shared_ptr<Net::Http::V2::Session> session, std::shared_ptr<Net::Http::V2::Stream> stream, std::shared_ptr<Net::Http::Request> request)
 {
-	path phpfile = L"D:\\Web" / connection->request.path;
+	path phpfile = L"D:\\Web" / request->path;
 #ifdef ZTS
 	if (tsrm_get_ls_cache() == nullptr)
 	{
-		ts_resource(resources++);
-		if (resources == 1)
+		int res = resources++;
+		ts_resource(res);
+		if (res == 0)
 		{
 			sapi_startup(&phprun_sapi_module);
+			if (phprun_sapi_module.startup(&phprun_sapi_module) == FAILURE) {
+				std::cout << "module nicht gestartet" << "\n";
+				return;
+			}
 		}
-		if (phprun_sapi_module.startup(&phprun_sapi_module) == FAILURE) {
-			std::cout << "module nicht gestartet" << "\n";
-			return;
-		}
+		
 		//ts_free_id(resources - 1);
 
 	}
 #endif
 	{
 		zend_file_handle file_handle;
-		PHPClientData info = { connection };
+		PHPClientData info = { session, stream, request };
 		std::string phpfilestring = phpfile.u8string();
 		file_handle.type = ZEND_HANDLE_FILENAME;
 		file_handle.filename = (char *)phpfilestring.c_str();
 		file_handle.free_filename = 0;
 		file_handle.opened_path = NULL;
 
-		SG(request_info).query_string = (char*)(info.env["QUERY_STRING"] = connection->request.query).data();
+		SG(request_info).query_string = (char*)(info.env["QUERY_STRING"] = request->query).data();
 		SG(request_info).proto_num = 200;
 		SG(request_info).path_translated = (char *)phpfilestring.c_str();
 		SG(request_info).content_length = 0;
-		SG(request_info).request_method = (char *)(info.env["REQUEST_METHOD"] = connection->request.method).data();
-		SG(request_info).content_length = connection->request.contentlength;
-		SG(request_info).content_type = connection->request.contenttype.data();
+		SG(request_info).request_method = (char *)(info.env["REQUEST_METHOD"] = request->method).data();
+		SG(request_info).content_length = request->contentlength;
+		SG(request_info).content_type = request->contenttype.data();
 		info.env["DOCUMENT_ROOT"] = "D:\\Web";
 		info.env["HTTPS"] = "1";
 		info.env["SERVER_PROTOCOL"] = "h2";
 		info.env["HTTP_CONNECTION"] = "Keep-Alive";
 		info.env["SCRIPT_FILENAME"] = phpfilestring;
-		info.env["PHP_SELF"] = connection->request.path;
-		info.env["SCRIPT_NAME"] = connection->request.path;
-		info.env["REQUEST_URI"] = connection->request.uri;
-		for (auto &entry : connection->request.headerlist)
+		info.env["PHP_SELF"] = request->path;
+		info.env["SCRIPT_NAME"] = request->path;
+		info.env["REQUEST_URI"] = request->uri;
+		for (auto &entry : request->headerlist)
 		{
-			std::string & key = translate[entry.first];
-			if (!key.empty())
+			auto key = translate.lower_bound(entry.first);
+			if (key != translate.end())
 			{
-				info.env[key] = entry.second;
+				info.env[key->second] = entry.second;
 			}
 		}
 #ifndef ZTS
@@ -253,5 +258,5 @@ void PHPSapi::requesthandler(std::shared_ptr<Net::Http::Connection> connection)
 		phpsync.unlock();
 #endif
 	}
-	connection->SendData(0, 0, true);
+	session->SendData(stream, 0, 0, true);
 }

@@ -64,12 +64,12 @@ Frame::Frame(std::vector<uint8_t>::const_iterator & buffer)
 	streamidentifier = GetUInt31(buffer);
 }
 
-bool Frame::HasFlag(FrameFlag flag)
+bool Frame::HasFlag(FrameFlag flag) const
 {
 	return (uint8_t)flags & (uint8_t)flag;
 }
 
-std::vector<uint8_t> Frame::ToArray()
+std::vector<uint8_t> Frame::ToArray() const
 {
 	std::vector<uint8_t> frame(9);
 	auto iter = frame.begin();
