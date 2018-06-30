@@ -114,6 +114,7 @@ std::shared_ptr<std::thread> TLSSocketListener::Listen(const std::shared_ptr<soc
 {
 	if (SSL_CTX_check_private_key(sslctx) != 1)
 		return std::shared_ptr<std::thread>();
+	if(GetProtocols().length() > 1)
 	{
 		SSL_CTX_set_alpn_select_cb(sslctx, [](SSL * ssl, const unsigned char ** out, unsigned char * outlen, const unsigned char * in, unsigned int inlen, void * args) -> int
 		{

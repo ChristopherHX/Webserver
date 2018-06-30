@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <vector>
+#include "Stream.h"
 
 uint16_t GetUInt16(std::vector<uint8_t>::const_iterator & buffer);
 uint32_t GetUInt31(std::vector<uint8_t>::const_iterator & buffer);
@@ -14,39 +15,38 @@ namespace Net
 	{
 		namespace V2
 		{
-			enum class FrameFlag : uint8_t
-			{
-				END_STREAM = 0x1,
-				ACK = 0x1,
-				END_HEADERS = 0x4,
-				PADDED = 0x8,
-				PRIORITY = 0x20
-			};
-
-			enum class FrameType : uint8_t
-			{
-				DATA = 0x0,
-				HEADERS = 0x1,
-				PRIORITY = 0x2,
-				RST_STREAM = 0x3,
-				SETTINGS = 0x4,
-				PUSH_PROMISE = 0x5,
-				PING = 0x6,
-				GOAWAY = 0x7,
-				WINDOW_UPDATE = 0x8,
-				CONTINUATION = 0x9
-			};
-
 			struct Frame
 			{
 			public:
+				enum class Type : uint8_t
+				{
+					DATA = 0x0,
+					HEADERS = 0x1,
+					PRIORITY = 0x2,
+					RST_STREAM = 0x3,
+					SETTINGS = 0x4,
+					PUSH_PROMISE = 0x5,
+					PING = 0x6,
+					GOAWAY = 0x7,
+					WINDOW_UPDATE = 0x8,
+					CONTINUATION = 0x9
+				};
+
+				enum class Flag : uint8_t
+				{
+					END_STREAM = 0x1,
+					ACK = 0x1,
+					END_HEADERS = 0x4,
+					PADDED = 0x8,
+					PRIORITY = 0x20
+				};
+
 				uint32_t length;
-				FrameType type;
-				FrameFlag flags;
-				uint32_t streamidentifier;
+				Type type;
+				Flag flags;
+				std::shared_ptr<Stream> stream;
 				Frame();
-				Frame(std::vector<uint8_t>::const_iterator & buffer);
-				bool HasFlag(FrameFlag flag) const;
+				bool HasFlag(Flag flag) const;
 				std::vector<uint8_t> ToArray() const;
 			};
 		}

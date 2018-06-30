@@ -3,7 +3,7 @@
 
 using namespace Net::Http::V2;
 
-const std::pair<std::string, std::string> HPack::StaticTable[61] = {
+const std::pair<std::string_view, std::string_view> HPack::StaticTable[61] = {
 	{ ":authority", "" },
 	{ ":method","GET" },
 	{ ":method","POST" },

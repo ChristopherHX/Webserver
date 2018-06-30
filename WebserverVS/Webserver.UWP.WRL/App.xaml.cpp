@@ -126,7 +126,7 @@ App::App()
 					socket->ReceiveAll(buffer.data(), frame.length);
 					auto pos = buffer.data(), end = pos + frame.length;
 					uint8_t padlength = 0;
-					if (frame.HasFlag(Net::Http::V2::FrameFlag::PADDED))
+					if (frame.HasFlag(Net::Http::V2::Frame::Flag::PADDED))
 					{
 						padlength = *pos++;
 						if (padlength > frame.length)
@@ -135,29 +135,29 @@ App::App()
 					}
 					switch (frame.type)
 					{
-					case Net::Http::V2::FrameType::DATA:
+					case Net::Http::V2::Frame::Type::DATA:
 					{
 						if (frame.streamidentifier == 0)
 							throw ErrorCode::PROTOCOL_ERROR;
-						if (!(streams[frame.streamidentifier]->state == Net::Http::V2::StreamState::open || streams[frame.streamidentifier]->state == Net::Http::V2::StreamState::half_closed_local))
+						if (!(streams[frame.streamidentifier]->state == Net::Http::V2::Stream::State::open || streams[frame.streamidentifier]->state == Net::Http::V2::Stream::State::half_closed_local))
 							throw ErrorCode::STREAM_CLOSED;
 						if ((end - pos) > 0)
 							streams[frame.streamidentifier]->OnData(pos, end - pos);
 						break;
 					}
-					case Net::Http::V2::FrameType::HEADERS:
+					case Net::Http::V2::Frame::Type::HEADERS:
 					{
 						if (frame.streamidentifier == 0)
 							throw ErrorCode::PROTOCOL_ERROR;
-						if (frame.HasFlag(Net::Http::V2::FrameFlag::END_STREAM))
+						if (frame.HasFlag(Net::Http::V2::Frame::Flag::END_STREAM))
 						{
-							streams[frame.streamidentifier]->state = Net::Http::V2::StreamState::half_closed_remote;
+							streams[frame.streamidentifier]->state = Net::Http::V2::Stream::State::half_closed_remote;
 						}
 						else
 						{
-							streams[frame.streamidentifier]->state = Net::Http::V2::StreamState::open;
+							streams[frame.streamidentifier]->state = Net::Http::V2::Stream::State::open;
 						}
-						if (frame.HasFlag(Net::Http::V2::FrameFlag::PRIORITY))
+						if (frame.HasFlag(Net::Http::V2::Frame::Flag::PRIORITY))
 						{
 							streams[frame.streamidentifier]->priority.exclusive = *pos & 0x80;
 							streams[frame.streamidentifier]->priority.dependency = GetUInt31(&*pos);
@@ -170,7 +170,7 @@ App::App()
 						connection->frame = frame;
 						connection->socket = socket;
 						connection->stream = streams[frame.streamidentifier];
-						if (frame.HasFlag(Net::Http::V2::FrameFlag::END_HEADERS))
+						if (frame.HasFlag(Net::Http::V2::Frame::Flag::END_HEADERS))
 						{
 							RequestHandler(connection);
 						}
@@ -178,7 +178,7 @@ App::App()
 						{
 							streams[frame.streamidentifier]->SetOnContinuation([connection, &decoder](Net::Http::V2::Frame & frame, const uint8_t * buffer, uint32_t length) {
 								connection->request.AppendHttp2(decoder, buffer, length);
-								if (frame.HasFlag(Net::Http::V2::FrameFlag::END_HEADERS))
+								if (frame.HasFlag(Net::Http::V2::Frame::Flag::END_HEADERS))
 								{
 									RequestHandler(connection);
 								}
@@ -186,7 +186,7 @@ App::App()
 						}
 						break;
 					}
-					case Net::Http::V2::FrameType::PRIORITY:
+					case Net::Http::V2::Frame::Type::PRIORITY:
 					{
 						streams[frame.streamidentifier]->priority.exclusive = *pos & 0x80;
 						streams[frame.streamidentifier]->priority.dependency = GetUInt31(&*pos);
@@ -194,18 +194,18 @@ App::App()
 						streams[frame.streamidentifier]->priority.weight = *pos++;
 						break;
 					}
-					case Net::Http::V2::FrameType::RST_STREAM:
+					case Net::Http::V2::Frame::Type::RST_STREAM:
 					{
 						ErrorCode code;
 						std::reverse_copy(pos, pos + 4, (unsigned char*)&code);
 						pos += 4;
-						streams[frame.streamidentifier]->state = Net::Http::V2::StreamState::closed;
+						streams[frame.streamidentifier]->state = Net::Http::V2::Stream::State::closed;
 						//Abord Work
 						break;
 					}
-					case Net::Http::V2::FrameType::SETTINGS:
+					case Net::Http::V2::Frame::Type::SETTINGS:
 					{
-						if (!frame.HasFlag(Net::Http::V2::FrameFlag::ACK))
+						if (!frame.HasFlag(Net::Http::V2::Frame::Flag::ACK))
 						{
 							while (pos != end)
 							{
@@ -218,29 +218,29 @@ App::App()
 							{
 								Net::Http::V2::Frame response;
 								response.length = 0;
-								response.type = Net::Http::V2::FrameType::SETTINGS;
-								response.flags = Net::Http::V2::FrameFlag::ACK;
+								response.type = Net::Http::V2::Frame::Type::SETTINGS;
+								response.flags = Net::Http::V2::Frame::Flag::ACK;
 								response.streamidentifier = frame.streamidentifier;
 								socket->SendAll(response.ToArray());
 							}
 						}
 						break;
 					}
-					case Net::Http::V2::FrameType::PING:
+					case Net::Http::V2::Frame::Type::PING:
 					{
-						if (frame.flags != Net::Http::V2::FrameFlag::ACK)
+						if (frame.flags != Net::Http::V2::Frame::Flag::ACK)
 						{
 							Net::Http::V2::Frame response;
 							response.length = frame.length;
-							response.type = Net::Http::V2::FrameType::PING;
-							response.flags = Net::Http::V2::FrameFlag::ACK;
+							response.type = Net::Http::V2::Frame::Type::PING;
+							response.flags = Net::Http::V2::Frame::Flag::ACK;
 							response.streamidentifier = frame.streamidentifier;
 							socket->SendAll(response.ToArray());
 							socket->SendAll(buffer.data(), response.length);
 						}
 						break;
 					}
-					case Net::Http::V2::FrameType::GOAWAY:
+					case Net::Http::V2::Frame::Type::GOAWAY:
 					{
 						uint32_t laststreamid = ntohl(*(uint32_t*)&*pos);
 						pos += 4;
@@ -249,8 +249,8 @@ App::App()
 						{
 							Net::Http::V2::Frame response;
 							response.length = 8;
-							response.type = Net::Http::V2::FrameType::GOAWAY;
-							response.flags = (Net::Http::V2::FrameFlag)0;
+							response.type = Net::Http::V2::Frame::Type::GOAWAY;
+							response.flags = (Net::Http::V2::Frame::Flag)0;
 							response.streamidentifier = frame.streamidentifier;
 							socket->SendAll(response.ToArray());
 							auto wpos = buffer.begin();
@@ -261,13 +261,13 @@ App::App()
 						}
 						throw std::runtime_error("GOAWAY");
 					}
-					case Net::Http::V2::FrameType::WINDOW_UPDATE:
+					case Net::Http::V2::Frame::Type::WINDOW_UPDATE:
 					{
 						uint32_t WindowSizeIncrement = ntohl(((*(uint32_t*)&*pos) << 1) & 0xfffffffe);
 						buffer.resize(buffer.size() + WindowSizeIncrement);
 						break;
 					}
-					case Net::Http::V2::FrameType::CONTINUATION:
+					case Net::Http::V2::Frame::Type::CONTINUATION:
 						streams[frame.streamidentifier]->OnContinuation(frame, pos, end - pos);
 						break;
 					}

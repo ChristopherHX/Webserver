@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <condition_variable>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -27,10 +28,14 @@ namespace Net
 		SOCKET handle;
 		std::shared_ptr<sockaddr> socketaddress;
 		std::string protocol;
+		std::mutex readlock;
+		std::mutex writelock;
 	public:
 		Socket(Socket && socket);
 		Socket(SOCKET socket, const std::shared_ptr<sockaddr> & socketaddress);
 		virtual ~Socket();
+		std::unique_lock<std::mutex> GetWriteLock();
+		std::unique_lock<std::mutex> GetReadLock();
 		SOCKET GetHandle();
 		std::string GetAddress();
 		uint16_t GetPort();

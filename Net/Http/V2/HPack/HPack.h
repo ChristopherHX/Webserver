@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
-#include <string>
 #include <utility>
+#include <string_view>
 
 #if !defined(IMPORT) && defined(_WIN32)
 #define IMPORT  __declspec( dllimport )
@@ -17,7 +17,7 @@ namespace Net
 		{
 			namespace HPack
 			{
-				IMPORT extern const std::pair<std::string, std::string> StaticTable[61];
+				IMPORT extern const std::pair<std::string_view, std::string_view> StaticTable[61];
 				IMPORT extern const std::pair<uint32_t, uint8_t> StaticHuffmanTable[257];
 			}
 		}

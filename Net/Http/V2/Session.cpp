@@ -9,67 +9,54 @@
 using namespace Net::Http::V2;
 using namespace std::experimental::filesystem;
 
-static std::unordered_map<FrameType, std::function<void(std::shared_ptr<Session>, std::shared_ptr<std::vector<uint8_t>>, std::shared_ptr<Frame>)>> framehandler = {
-	{ FrameType::DATA, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
-	if (frame->streamidentifier == 0)
-		throw ErrorCode::PROTOCOL_ERROR;
-	auto stream = session->GetStream(frame->streamidentifier);
-	if (!(stream->state == StreamState::open || stream->state == StreamState::half_closed_local))
-		throw ErrorCode::STREAM_CLOSED;
-	auto beg = buffer->cbegin();
-	auto end = beg + frame->length;
-	if (frame->HasFlag(FrameFlag::PADDED))
-	{
-		uint8_t padlength = *beg++;
-		if (padlength > frame->length)
-			throw ErrorCode::PROTOCOL_ERROR;
-		end -= padlength;
-	}
-	stream->OnData(beg, end - beg);
-} },
-{ FrameType::HEADERS, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
-	if (frame->streamidentifier == 0)
-		throw ErrorCode::PROTOCOL_ERROR;
-	auto stream = session->GetStream(frame->streamidentifier);
-	stream->state = frame->HasFlag(FrameFlag::END_STREAM) ? StreamState::half_closed_remote : StreamState::open;
+static std::unordered_map<Frame::Type, std::function<void(std::shared_ptr<Session>, std::shared_ptr<std::vector<uint8_t>>, std::shared_ptr<Frame>)>> framehandler = {
+{ Frame::Type::HEADERS, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
+	if (frame->stream->identifier == 0)
+		throw Error(Error::Type::Connection, Error::Code::PROTOCOL_ERROR, "HEADERS frames MUST be associated with a stream");
+	auto stream = frame->stream;
+	stream->state = frame->HasFlag(Frame::Flag::END_STREAM) ? Stream::State::half_closed_remote : Stream::State::open;
 	auto beg = buffer->cbegin();
 	auto end = beg + frame->length;	
-	if (frame->HasFlag(FrameFlag::PRIORITY))//???Wie war es jetzt
+	if (frame->HasFlag(Frame::Flag::PRIORITY))
 	{
-		stream->priority = StreamPriority(beg);
+		beg = Stream::Priority::Parse(beg, stream->priority);
 	}
-	if (frame->HasFlag(FrameFlag::PADDED))
+	if (frame->HasFlag(Frame::Flag::PADDED))
 	{
 		uint8_t padlength = *beg++;
 		if (padlength > frame->length)
-			throw ErrorCode::PROTOCOL_ERROR;
+			throw Error::Code::PROTOCOL_ERROR;
 		end -= padlength;
+		if((end - beg) < padlength)
+			throw Error(Error::Type::Connection, Error::Code::PROTOCOL_ERROR, "Padding exceeds the size remaining for the header block");
 	}
 	std::shared_ptr<Net::Http::Request> request = std::make_shared<Net::Http::Request>();
 	request->DecodeHttp2(session->GetDecoder(), beg, end);
-	if (frame->HasFlag(FrameFlag::END_HEADERS))
+	if (frame->HasFlag(Frame::Flag::END_HEADERS))
 	{
 		session->requesthandler(session, stream, request);
 	}
-	//else
-	//{
-	//	stream->SetOnContinuation([connection, &decoder](Frame & frame, std::vector<uint8_t>::const_iterator & buffer, uint32_t length) {
-	//		connection->request.DecodeHttp2(decoder, buffer, buffer + length);
-	//		if (frame.HasFlag(FrameFlag::END_HEADERS))
-	//		{
-	//			RequestHandler(connection);
-	//		}
-	//	});
-	//}
-} },{ FrameType::PRIORITY, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
-        auto pos = buffer->cbegin();
-	session->GetStream(frame->streamidentifier)->priority = StreamPriority(pos);
-} },{ FrameType::RST_STREAM, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
-	auto pos = buffer->cbegin();
-        session->GetStream(frame->streamidentifier)->Reset((ErrorCode)GetUInt32(pos));
-} },{ FrameType::SETTINGS, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
-	if (!frame->HasFlag(FrameFlag::ACK))
+} },{ Frame::Type::PRIORITY, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
+	if(frame->length != 5)
+		throw Error(Error::Type::Stream, Error::Code::FRAME_SIZE_ERROR);
+	Stream::Priority::Parse(buffer->cbegin(), frame->stream->priority);
+} },{ Frame::Type::RST_STREAM, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
+	if (frame->stream->identifier == 0)
+		throw Error(Error::Type::Connection, Error::Code::PROTOCOL_ERROR, "RST_STREAM frames MUST be associated with a stream");
+	if (frame->stream->state == Stream::State::idle)
+		throw Error(Error::Type::Connection, Error::Code::PROTOCOL_ERROR, "RST_STREAM frames MUST NOT be sent for a stream in the \"idle\" state");
+	if(frame->length != 4)
+		throw Error(Error::Type::Stream, Error::Code::FRAME_SIZE_ERROR);
+	Error::Code code;
+	GetUInt32(buffer, (uint32_t&)code);
+    frame->stream->Reset(code);
+} },{ Frame::Type::SETTINGS, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
+	if (frame->stream->identifier != 0)
+		throw Error(Error::Type::Connection, Error::Code::PROTOCOL_ERROR, "SETTINGS frames always apply to a connection, never a single stream");
+	if (!frame->HasFlag(Frame::Flag::ACK))
 	{
+		if((frame->length % 6) != 0)
+			throw Error(Error::Type::Connection, Error::Code::FRAME_SIZE_ERROR);
 		auto pos = buffer->cbegin(), end = pos + frame->length;
 		while (pos != end)
 		{
@@ -79,113 +66,108 @@ static std::unordered_map<FrameType, std::function<void(std::shared_ptr<Session>
 		{
 			Frame response;
 			response.length = 0;
-			response.type = FrameType::SETTINGS;
-			response.flags = FrameFlag::ACK;
-			response.streamidentifier = frame->streamidentifier;
-			session->SendFrame(session->GetStream(frame->streamidentifier), response);
+			response.type = Frame::Type::SETTINGS;
+			response.flags = Frame::Flag::ACK;
+			response.stream = frame->stream;
+			session->SendFrame(frame->stream, response);
 		}
+	} else {
+		if(frame->length != 0)
+			throw Error(Error::Type::Connection, Error::Code::FRAME_SIZE_ERROR);
 	}
-} },{ FrameType::PING, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
-	if (!frame->HasFlag(FrameFlag::ACK))
+} },{ Frame::Type::PING, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
+	if (frame->stream->identifier != 0)
+		throw Error(Error::Type::Connection, Error::Code::PROTOCOL_ERROR, "PING frames are not associated with any individual stream");
+	if(frame->length != 8)
+		throw Error(Error::Type::Stream, Error::Code::FRAME_SIZE_ERROR);
+	if (!frame->HasFlag(Frame::Flag::ACK))
 	{
 		Frame response;
 		response.length = frame->length;
-		response.type = FrameType::PING;
-		response.flags = FrameFlag::ACK;
-		response.streamidentifier = frame->streamidentifier;
-                auto pos = buffer->begin();
-		session->SendFrame(session->GetStream(frame->streamidentifier), response, pos);
+		response.type = Frame::Type::PING;
+		response.flags = Frame::Flag::ACK;
+		response.stream = frame->stream;
+    	auto pos = buffer->begin();
+		session->SendFrame(frame->stream, response, pos);
 	}
-} },{ FrameType::GOAWAY, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
+} },{ Frame::Type::GOAWAY, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
+	if (frame->stream->identifier != 0)
+		throw Error(Error::Type::Connection, Error::Code::PROTOCOL_ERROR, "The GOAWAY frame applies to the connection, not a specific stream");
 	auto pos = buffer->cbegin();
 	uint32_t laststreamid = GetUInt31(pos);
-	ErrorCode code = (ErrorCode)GetUInt32(pos);
+	Error::Code code = (Error::Code)GetUInt32(pos);
 	{
 		Frame response;
 		response.length = frame->length;
-		response.type = FrameType::GOAWAY;
-		response.flags = (FrameFlag)0;
-		response.streamidentifier = frame->streamidentifier;
+		response.type = Frame::Type::GOAWAY;
+		response.flags = (Frame::Flag)0;
+		response.stream = frame->stream; 
 		auto wpos = buffer->begin();
 		AddUInt31(laststreamid, wpos);
-		AddUInt32((uint32_t)ErrorCode::NO_ERROR, wpos);
-                auto pos = buffer->begin();
-		session->SendFrame(session->GetStream(frame->streamidentifier), response, pos);
+		AddUInt32((uint32_t)Error::Code::NO_ERROR, wpos);
+        auto pos = buffer->begin();
+		session->SendFrame(frame->stream, response, pos);
 	}
-} },{ FrameType::WINDOW_UPDATE, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
-        auto pos = buffer->cbegin();
-	session->GetStream(frame->streamidentifier)->rwindowsize += GetUInt31(pos);
-	//buffer.resize(buffer.size() + WindowSizeIncrement);
-} },{ FrameType::CONTINUATION, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
-        auto pos = buffer->cbegin();
-	session->GetStream(frame->streamidentifier)->OnContinuation(*frame, pos, frame->length);
+} },{ Frame::Type::WINDOW_UPDATE, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
+	uint32_t windowinc;
+	GetUInt31(buffer->cbegin(), windowinc);
+	frame->stream->rwindowsize += windowinc;
 } }
 };
 
 void Net::Http::V2::Session::Start()
 {
+	std::vector<uint8_t> buffer(settings[(size_t)Setting::MAX_FRAME_SIZE]);
 	{
-		uint8_t buffer[24];
-		if (!socket->ReceiveAll(buffer, 24) || memcmp(buffer, "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n", 24))
+		uint8_t preface[] = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
+		Frame frame;
+		frame.flags = Frame::Flag(0);
+		frame.type = Frame::Type::SETTINGS;
+		frame.length = 0;
+		socket->SendAll(preface, sizeof(preface) - 1);
+		if (!socket->ReceiveAll(buffer.data(), sizeof(preface) - 1) || memcmp(buffer.data(), preface, sizeof(preface) - 1))
 			throw std::runtime_error(u8"Invalid Connection Preface");
 	}
 	while (true)
 	{
-		std::shared_ptr<std::vector<uint8_t>> buffer;
-		if (buffers.empty())
+		if (!socket->ReceiveAll(buffer.data(), 9))
+			throw Error(Error::Type::Connection, Error::Code::FRAME_SIZE_ERROR);
+		auto pos = buffer.cbegin();
+		auto frame = std::make_shared<Frame>();
+		pos = GetUInt32(pos, frame->length);			
+		frame->type = (Frame::Type)*pos++;
+		frame->flags = (Frame::Flag)*pos++;
+		uint32_t streamid;
+		pos = GetUInt32(pos, streamid);
+		if (buffer.size() < frame->length)
 		{
-			buffer = std::make_shared<std::vector<uint8_t>>(settings[(size_t)Setting::MAX_FRAME_SIZE]);
+			if (frame->length > settings[Setting::MAX_FRAME_SIZE])
+				throw Error(frame->type == Frame::Type::HEADERS || frame->type == Frame::Type::PUSH_PROMISE || frame->type == Frame::Type::CONTINUATION || frame->stream->identifier == 0 ? Error::Type::Connection : Error::Type::Stream, Error::Code::FRAME_SIZE_ERROR);
+			buffer.resize(settings[Setting::MAX_FRAME_SIZE]);
 		}
-		else
-		{
-			buffer = buffers.top();
-			buffers.pop();
-		}
-		if (socket->ReceiveAll(buffer->data(), 9))
-		{
-                        auto pos = buffer->cbegin();
-			auto frame = std::make_shared<Frame>(pos);
-			if (frame->length < settings[(size_t)Setting::MAX_FRAME_SIZE])
+		if(frame->type == Frame::Type::DATA) {
+			if (frame->stream->identifier == 0)
+				throw Error(Error::Type::Connection, Error::Code::PROTOCOL_ERROR, "DATA frames MUST be associated with a stream");
+			if (!(((uint8_t)frame->stream->state & (uint8_t)Stream::State::half_closed_local) == (uint8_t)Stream::State::half_closed_local))
+				throw Error(Error::Type::Stream, Error::Code::STREAM_CLOSED);
+			auto beg = buffer.cbegin();
+			auto end = beg + frame->length;
+			if (frame->HasFlag(Frame::Flag::PADDED))
 			{
-				if (buffer->size() < frame->length)
-					buffer->resize(settings[(size_t)Setting::MAX_FRAME_SIZE]);
-				if (socket->ReceiveAll(buffer->data(), frame->length))
-				{
-					std::thread run([](std::shared_ptr<Session> session, std::shared_ptr<Frame> frame, std::shared_ptr<std::vector<uint8_t>> buffer) {
-						try {
-							framehandler.at(frame->type)(session,buffer, frame);
-						}
-						catch (const std::runtime_error & error) {
-							//std::cout << "frame error: " << error.what() << std::endl;
-							//__debugbreak();
-						}
-						session->ReleaseBuffer(buffer);
-					}, std::static_pointer_cast<Session>(shared_from_this()), frame, buffer);
-					run.detach();
-				}
+				uint8_t padlength = *beg++;
+				if (padlength > frame->length)
+					throw Error(Error::Type::Connection, Error::Code::PROTOCOL_ERROR, "The length of the padding is the length of the frame payload or greater");
+				end -= padlength;
 			}
-			else
-			{
-				break;
-			}
+			throw std::runtime_error("Not Implemented");
+			//frame->stream->ReceiveData(Frame)
 		}
-	}
-}
+		else {
+			if (!socket->ReceiveAll(buffer.data(), frame->length))
+				throw Error(Error::Type::Connection, Error::Code::FRAME_SIZE_ERROR);
 
-std::shared_ptr<Net::Http::V2::Stream> Net::Http::V2::Session::GetStream(uint32_t streamidentifier)
-{
-	uint32_t id = streamidentifier >> 1;
-	if ((streamidentifier & 1) == 1)
-	{
-		if (rstreams.size() <= id)
-			rstreams.resize(id + 1);
-		return rstreams[id] ? rstreams[id] : (rstreams[id] = std::make_shared<Net::Http::V2::Stream>(streamidentifier, settings[(size_t)Setting::INITIAL_WINDOW_SIZE]));
-	}
-	else
-	{
-		if (hstreams.size() <= id)
-			hstreams.resize(id + 1);
-		return hstreams[id] ? hstreams[id] : (hstreams[id] = std::make_shared<Net::Http::V2::Stream>(streamidentifier, settings[(size_t)Setting::INITIAL_WINDOW_SIZE]));
+			//framehandler.at(frame->type)(shared_from_this(),buffer, frame);
+		}
 	}
 }
 
@@ -195,7 +177,7 @@ void Net::Http::V2::Session::SendFrame(std::shared_ptr<Stream> stream, const Fra
 	{
 		std::unique_lock<std::mutex> lock(sync);		
 		auto wait_fn = [stream = GetStream(stream->priority.dependency)]() -> bool {
-			return stream->state == StreamState::closed;
+			return stream->state == Stream::State::closed;
 		};
 		if(!wait_fn())
 			synccv.wait(lock, wait_fn);
@@ -209,7 +191,7 @@ void Net::Http::V2::Session::SendFrame(std::shared_ptr<Stream> stream, const Fra
 	{
 		std::unique_lock<std::mutex> lock(sync);		
 		auto wait_fn = [stream = GetStream(stream->priority.dependency)]() -> bool {
-			return stream->state == StreamState::closed;
+			return stream->state == Stream::State::closed;
 		};
 		if(!wait_fn())
 			synccv.wait(lock, wait_fn);
@@ -225,11 +207,11 @@ void Net::Http::V2::Session::SendResponse(std::shared_ptr<Stream> stream, const 
 	response.EncodeHttp2(encoder, end);
 	Frame result;
 	result.length = end - buffer.begin();
-	result.type = FrameType::HEADERS;
-	result.flags = FrameFlag::END_HEADERS;
+	result.type = Frame::Type::HEADERS;
+	result.flags = Frame::Flag::END_HEADERS;
 	if(endstream) 
-		(uint8_t&)result.flags |= (uint8_t)FrameFlag::END_STREAM;
-	result.streamidentifier = stream->identifier;
+		(uint8_t&)result.flags |= (uint8_t)Frame::Flag::END_STREAM;
+	result.stream = stream;
         auto pos = buffer.begin();
 	SendFrame(stream, result, pos);
 }
@@ -237,17 +219,20 @@ void Net::Http::V2::Session::SendResponse(std::shared_ptr<Stream> stream, const 
 void Net::Http::V2::Session::SendData(std::shared_ptr<Stream> stream, const uint8_t * buffer, int length, bool endstream)
 {
 	Frame result;
-	result.type = FrameType::DATA;
-	result.flags = (FrameFlag)0;
-	result.streamidentifier = stream->identifier;
-	uint32_t chunk = settings[(uint32_t)Setting::MAX_FRAME_SIZE];
+	result.type = Frame::Type::DATA;
+	result.flags = (Frame::Flag)0;
+	result.stream = stream;
+	uint32_t chunk = settings[Setting::MAX_FRAME_SIZE];
 	do
 	{
 		result.length = std::min<uint32_t>(chunk, length);
 		if (endstream && result.length == length)
-			result.flags = FrameFlag::END_STREAM;
-		socket->SendAll(result.ToArray());
-		socket->SendAll(buffer, result.length);
+			result.flags = Frame::Flag::END_STREAM;
+		{
+			auto lock = socket->GetWriteLock();
+			socket->SendAll(result.ToArray());
+			socket->SendAll(buffer, result.length);
+		}
 		length -= result.length;
 		buffer += result.length;
 	} while (length > 0);
@@ -255,5 +240,5 @@ void Net::Http::V2::Session::SendData(std::shared_ptr<Stream> stream, const uint
 
 uint32_t & Net::Http::V2::Session::GetSetting(Setting setting)
 {
-	return settings[(size_t)setting];
+	return settings[setting];
 }

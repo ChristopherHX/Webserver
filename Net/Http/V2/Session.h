@@ -11,23 +11,49 @@
 namespace Net {
 	namespace Http {
 		namespace V2 {
+			template<class Iter>
+			Iter GetUInt16(Iter buffer, uint16_t & number)
+			{
+				number = buffer[0] << 8 | buffer[1];
+				return buffer + 2;
+			}
+
+			template<class Iter>
+			Iter GetUInt24(Iter buffer, uint32_t & number)
+			{
+				number = buffer[0] << 16 | buffer[1] << 8 | buffer[2];
+				return buffer + 3;
+			}
+
+			template<class Iter>
+			Iter GetUInt32(Iter buffer, uint32_t & number)
+			{
+				uint32_t number = (buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3];
+				return buffer + 4;
+			}
+
+			template<class Iter>
+			Iter GetUInt31(Iter buffer, uint32_t & number)
+			{
+				auto pos = GetUInt32(buffer, number);
+				number &= 0x7fffffff;
+				return pos;
+			}
+
 			class Session : public Net::Http::Session {
 			private:
 				std::mutex sync;
 				std::condition_variable synccv;
 				std::shared_ptr<HPack::Encoder> encoder = std::make_shared<HPack::Encoder>();
 				std::shared_ptr<HPack::Decoder> decoder = std::make_shared<HPack::Decoder>();
-				std::vector<uint32_t> settings = { 4096, 1, (uint32_t)-1, 0xffff, 0x2fff, 0x4000, (uint32_t)-1 };
-				std::vector<std::shared_ptr<Stream>> rstreams;
-				std::vector<std::shared_ptr<Stream>> hstreams;
-				std::stack<std::shared_ptr<std::vector<uint8_t>>> buffers;
+				std::unordered_map<Setting,uint32_t> settings = { {Setting::HEADER_TABLE_SIZE, 4096}, {Setting::ENABLE_PUSH, 1}, { Setting::MAX_CONCURRENT_STREAMS, -1}, { Setting::INITIAL_WINDOW_SIZE, 0xffff}, { Setting::MAX_FRAME_SIZE, 0x2fff}, {Setting::MAX_HEADER_LIST_SIZE, 0x4000}};
+				std::vector<std::shared_ptr<Stream>> streams;
 			public:
 				Session(std::shared_ptr<Net::Socket> &socket) : Net::Http::Session(socket) {
 
 				}
 				void Start();
 				std::function<void(std::shared_ptr<Session>, std::shared_ptr<Stream>, std::shared_ptr<Net::Http::Request>)> requesthandler;				
-				std::shared_ptr<Net::Http::V2::Stream> GetStream(uint32_t streamidentifier);
 				void SendFrame(std::shared_ptr<Stream> stream, const Frame & frame);
 				void SendFrame(std::shared_ptr<Stream> stream, const Frame & frame, std::vector<uint8_t>::iterator & data);
 				void SendResponse(std::shared_ptr<Stream> stream, const Net::Http::Response & response, bool endstream);
@@ -36,9 +62,6 @@ namespace Net {
 				std::shared_ptr<HPack::Decoder> GetDecoder()
 				{
 					return decoder;
-				}
-				void ReleaseBuffer(const std::shared_ptr<std::vector<uint8_t>> & buffer) {
-					buffers.push(buffer);
 				}
 			};
 		}

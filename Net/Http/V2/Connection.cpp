@@ -11,9 +11,9 @@ void Connection::SendResponse(bool endstream)
 	response.EncodeHttp2(encoder, end);
 	Frame result;
 	result.length = end - buffer.begin();
-	result.type = FrameType::HEADERS;
-	result.flags = (FrameFlag)((uint8_t)FrameFlag::END_HEADERS | (endstream ? (uint8_t)FrameFlag::END_STREAM : 0));
-	result.streamidentifier = frame.streamidentifier;
+	result.type = Frame::Type::HEADERS;
+	result.flags = (Frame::Flag)((uint8_t)Frame::Flag::END_HEADERS | (endstream ? (uint8_t)Frame::Flag::END_STREAM : 0));
+	result.stream = frame.stream;
 	socket->SendAll(result.ToArray());
 	socket->SendAll(buffer.data(), result.length);
 }
@@ -21,16 +21,16 @@ void Connection::SendResponse(bool endstream)
 void Connection::SendData(const uint8_t* buffer, int length, bool endstream)
 {
 	Frame result;
-	result.type = FrameType::DATA;
-	result.flags = (FrameFlag)0;
-	result.streamidentifier = frame.streamidentifier;
+	result.type = Frame::Type::DATA;
+	result.flags = (Frame::Flag)0;
+	result.stream = frame.stream;
 	if (length > 0)
 	{
 		for (int i = 0; i < length; i += result.length)
 		{
 			result.length = std::min(512, length - i);
 			if (endstream && result.length < 512)
-				result.flags = FrameFlag::END_STREAM;
+				result.flags = Frame::Flag::END_STREAM;
 			socket->SendAll(result.ToArray());
 			socket->SendAll(buffer + i, result.length);
 		}
@@ -38,7 +38,7 @@ void Connection::SendData(const uint8_t* buffer, int length, bool endstream)
 	else
 	{
 		if(endstream)
-			result.flags = FrameFlag::END_STREAM;
+			result.flags = Frame::Flag::END_STREAM;
 		result.length = 0;
 		socket->SendAll(result.ToArray());
 	}
