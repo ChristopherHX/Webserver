@@ -17,7 +17,8 @@ unordered_map<string, string> MimeTypeTable = {
 	{ u8".ief" , u8"image/ief" },
 	{ u8".gif", u8"image/gif" },
 	{ u8".pdf", u8"application/pdf" },
-	{ u8".mpg", u8"video/mpeg" }
+	{ u8".mpg", u8"video/mpeg" },
+	{ u8".wasm", u8"application/wasm" },
 };
 
 string MimeType::Get(const string & extention)
