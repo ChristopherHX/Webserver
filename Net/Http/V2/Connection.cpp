@@ -44,11 +44,6 @@ void Connection::SendData(const uint8_t* buffer, int length, bool endstream)
 	}
 }
 
-void Connection::SetOnData(std::function<void(std::vector<uint8_t>::const_iterator & buffer, uint32_t length)> ondata)
-{
-	stream->SetOnData(ondata);
-}
-
 void Net::Http::Connection::SendData(std::vector<uint8_t>& buffer, int length, bool endstream)
 {
 	return SendData(buffer.data(), length, endstream);

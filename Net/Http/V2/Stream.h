@@ -36,31 +36,30 @@ namespace Net
 					half_closed_remote = 0b01,
 					closed = 0b10000
 				};
-				class Priority
-				{
-				public:
-					Priority();
-					template <class Iter>
-					static Iter Parse(Iter pos, Priority & priority) {
-						exclusive = *pos & 0x80;
-						dependency = GetUInt31(pos);
-						weight = *pos++;
-					}
-					bool exclusive;
-					uint32_t dependency;
-					uint8_t weight;
-				};
 				Stream(uint32_t identifier, uint32_t initialwindowsize);
 				uint32_t identifier;
 				State state;
-				Priority priority;
+				std::shared_ptr<Stream> dependency;
+				std::vector<std::shared_ptr<Stream>> children;
+				bool exclusive;
+				uint8_t weight;
 				uint32_t rwindowsize;
 				uint32_t hwindowsize;
-				void OnData(std::vector<uint8_t>::const_iterator & buffer, uint32_t length);
-				void SetOnData(std::function<void(std::vector<uint8_t>::const_iterator & buffer, uint32_t length)> ondata);
 				void Reset(Error::Code code);
 				void ReceiveData(int length, bool endstream);
-				void SendData(const uint8_t * buffer, int length, bool endstream);
+				// void SendData(const uint8_t * buffer, int length, bool endstream);
+				template <class Iter>
+				Iter ParsePriority(Iter pos, const Session & session) {
+					exclusive = *pos & 0x80;
+					uint32_t dependency;
+					pos = GetUInt31(pos, dependency);
+					this->dependency = session->GetStream(dependency);
+					if(exclusive) {
+						children = this->dependency->children;
+						this->dependency->children = {  };
+					}
+					weight = *pos++;
+				}
 			};
 		}
 	}

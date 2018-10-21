@@ -50,10 +50,14 @@ namespace Net
 
 					template<class Iter, class T> void AddHeaderBlock(Iter & buffer, const T& headerlist)
 					{
-						std::hash<std::string> hash_fn;
+						std::hash<std::string_view> hash_fn;
+						std::hash<std::string> hash_fn2;
 						for (const std::pair<std::string, std::string> & entry : headerlist) {
-							auto pred = [&hash_fn, hash = hash_fn(entry.first)](const std::pair<std::string, std::string> & pair) {
+							auto pred = [&hash_fn, hash = hash_fn(entry.first)](const std::pair<std::string_view, std::string_view> & pair) {
 								return hash == hash_fn(pair.first);
+							};
+							auto pred2 = [&hash_fn2, hash = hash_fn2(entry.first)](const std::pair<std::string, std::string> & pair) {
+								return hash == hash_fn2(pair.first);
 							};
 							auto tentry = std::find_if(StaticTable, std::end(StaticTable), pred);
 							if (tentry != std::end(StaticTable))
@@ -71,7 +75,7 @@ namespace Net
 							}
 							else
 							{
-								auto res = std::find_if(dynamictable.begin(), dynamictable.end(), pred);
+								auto res = std::find_if(dynamictable.begin(), dynamictable.end(), pred2);
 								if (res != dynamictable.end())
 								{
 									auto eentry = std::find(res, dynamictable.end(), entry);

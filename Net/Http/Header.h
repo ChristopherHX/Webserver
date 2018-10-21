@@ -6,7 +6,20 @@
 #include <memory>
 
 #include "V2/HPack/Encoder.h"
-#include "V2/HPack/Decoder.h"
+
+namespace Net
+{
+	namespace Http
+	{
+		namespace V2
+		{
+			namespace HPack
+			{
+				class Decoder;
+			}
+		}
+	}
+}
 
 namespace Net
 {
@@ -33,3 +46,5 @@ namespace Net
 		};
 	}
 }
+
+#include "V2/HPack/Decoder.h"

@@ -95,7 +95,29 @@ int main(int argc, const char** argv)
 			try
 			{
 				auto session = std::make_shared<V2::Session>(socket);
-				session->Start();
+				session->requesthandler = [&sock, &cnd_var](std::shared_ptr<V2::Session> session, std::shared_ptr<Stream> stream, std::shared_ptr<Net::Http::Request> request)
+                    {
+                        std::vector<uint8_t> buffer;
+						if (request->method == "GET" && request->path == "/status.html")
+						{
+							Net::Http::Response response;
+							response.status = 200;
+							response.headerlist.insert({ "content-length", "23" });
+							session->SendResponse(stream, response, false);
+							session->SendData(stream, (uint8_t*)"Http/1-2 Server Running", 23, true);
+						}
+						else
+						{
+							Net::Http::Response response;
+							response.status = 404;
+							response.contenttype = "text/plain";
+							std::string content = "Nicht gefunden";
+							response.contentlength = content.length();
+							session->SendResponse(stream, response, false);
+							session->SendData(stream, (const uint8_t*)content.data(), content.length(), true);
+						}
+                    };
+                    session->Start();
 			}
 			catch (const std::runtime_error & error)
 			{

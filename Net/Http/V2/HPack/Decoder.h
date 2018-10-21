@@ -2,14 +2,9 @@
 #include <cstdint>
 #include <vector>
 #include <string_view>
-
-namespace Net
-{
-	namespace Http
-	{
-		class Header;
-	}
-}
+#include <sstream>
+#include "../ErrorCode.h"
+#include "../../Header.h"
 
 namespace Net
 {
@@ -46,8 +41,8 @@ namespace Net
 						long long  i = 0, blength = length << 3;
 						union { 
 							uint64_t data64;
-							uint32_t[2] data32;
-							uint8_t[8] data8;
+							uint32_t data32[2];
+							uint8_t data8[8];
 						} buffer;
 						auto end = pos + length;
 						while (true)
@@ -56,7 +51,7 @@ namespace Net
 								uint32_t count = std::min<uint32_t>(5, (end - pos));
 								std::reverse_copy(pos, pos + count, (buffer.data8) + (5 - count));
 							}
-							const std::pair<uint32_t, uint8_t> *res = std::find_if(StaticHuffmanTable, StaticHuffmanTable + 256, [buffer = (uint32_t)(buffer >> (8 - (i % 8)))](const std::pair<uint32_t, uint8_t> & entry) -> bool {
+							const std::pair<uint32_t, uint8_t> *res = std::find_if(StaticHuffmanTable, StaticHuffmanTable + 256, [buffer = (uint32_t)(buffer.data64 >> (8 - (i % 8)))](const std::pair<uint32_t, uint8_t> & entry) -> bool {
 								return entry.first == (buffer >> (32 - entry.second));
 							});
 							pos += (i % 8 + res->second) >> 3;

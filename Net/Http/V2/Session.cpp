@@ -117,14 +117,14 @@ static std::unordered_map<Frame::Type, std::function<void(std::shared_ptr<Sessio
 
 void Net::Http::V2::Session::Start()
 {
-	std::vector<uint8_t> buffer(settings[(size_t)Setting::MAX_FRAME_SIZE]);
+	std::vector<uint8_t> buffer(settings[Setting::MAX_FRAME_SIZE]);
 	{
 		uint8_t preface[] = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
-		Frame frame;
-		frame.flags = Frame::Flag(0);
-		frame.type = Frame::Type::SETTINGS;
-		frame.length = 0;
-		socket->SendAll(preface, sizeof(preface) - 1);
+		// Frame frame;
+		// frame.flags = Frame::Flag(0);
+		// frame.type = Frame::Type::SETTINGS;
+		// frame.length = 0;
+		// socket->SendAll(preface, sizeof(preface) - 1);
 		if (!socket->ReceiveAll(buffer.data(), sizeof(preface) - 1) || memcmp(buffer.data(), preface, sizeof(preface) - 1))
 			throw std::runtime_error(u8"Invalid Connection Preface");
 	}
@@ -173,29 +173,29 @@ void Net::Http::V2::Session::Start()
 
 void Net::Http::V2::Session::SendFrame(std::shared_ptr<Stream> stream, const Frame &frame)
 {
-	if (stream->priority.dependency)
-	{
-		std::unique_lock<std::mutex> lock(sync);		
-		auto wait_fn = [stream = GetStream(stream->priority.dependency)]() -> bool {
-			return stream->state == Stream::State::closed;
-		};
-		if(!wait_fn())
-			synccv.wait(lock, wait_fn);
-	}
+	// if (stream->priority.dependency)
+	// {
+	// 	std::unique_lock<std::mutex> lock(sync);		
+	// 	auto wait_fn = [stream = GetStream(stream->priority.dependency)]() -> bool {
+	// 		return stream->state == Stream::State::closed;
+	// 	};
+	// 	if(!wait_fn())
+	// 		synccv.wait(lock, wait_fn);
+	// }
 	socket->SendAll(frame.ToArray());
 }
 
 void Net::Http::V2::Session::SendFrame(std::shared_ptr<Stream> stream, const Frame &frame, std::vector<uint8_t>::iterator & data)
 {
-	if (stream->priority.dependency)
-	{
-		std::unique_lock<std::mutex> lock(sync);		
-		auto wait_fn = [stream = GetStream(stream->priority.dependency)]() -> bool {
-			return stream->state == Stream::State::closed;
-		};
-		if(!wait_fn())
-			synccv.wait(lock, wait_fn);
-	}
+	// if (stream->dependency)
+	// {
+	// 	std::unique_lock<std::mutex> lock(sync);		
+	// 	auto wait_fn = [stream = GetStream(stream->priority.dependency)]() -> bool {
+	// 		return stream->state == Stream::State::closed;
+	// 	};
+	// 	if(!wait_fn())
+	// 		synccv.wait(lock, wait_fn);
+	// }
 	socket->SendAll(frame.ToArray());
 	socket->SendAll(&*data, frame.length);
 }
@@ -238,7 +238,12 @@ void Net::Http::V2::Session::SendData(std::shared_ptr<Stream> stream, const uint
 	} while (length > 0);
 }
 
-uint32_t & Net::Http::V2::Session::GetSetting(Setting setting)
-{
-	return settings[setting];
+std::shared_ptr<Stream> Net::Http::V2::Session::GetStream(uint32_t id) {
+	auto res = std::find_if(streams.begin(), streams.end(), [id](const std::shared_ptr<Stream>& stream) {
+		return stream->identifier == id;
+	});
+	if(res != streams.end()) {
+		return *res;
+	}
+	return std::shared_ptr<Stream>();
 }
