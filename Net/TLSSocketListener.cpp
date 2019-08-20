@@ -113,7 +113,7 @@ bool TLSSocketListener::UseCertificate(const uint8_t * buffer, int length, SSLFi
 std::shared_ptr<std::thread> TLSSocketListener::Listen(const std::shared_ptr<sockaddr> &address, socklen_t addresslen)
 {
 	if (SSL_CTX_check_private_key(sslctx) != 1)
-		return std::shared_ptr<std::thread>();
+		return nullptr;
 	if(GetProtocols().length() > 1)
 	{
 		SSL_CTX_set_alpn_select_cb(sslctx, [](SSL * ssl, const unsigned char ** out, unsigned char * outlen, const unsigned char * in, unsigned int inlen, void * args) -> int
@@ -131,7 +131,7 @@ std::shared_ptr<Socket> TLSSocketListener::Accept()
 	socklen_t size = sizeof(sockaddr_storage);
 	SOCKET socket = accept(this->handle, (sockaddr*)address.get(), &size);
 	if (socket == -1)
-		return std::shared_ptr<Socket>();
+		return nullptr;
 	return std::make_shared<TLSSocket>(sslctx, socket, std::shared_ptr<sockaddr>(address, (sockaddr*)address.get()));
 	//return std::make_shared<TLSSocket>(sslctx, SocketListener::Accept());
 }

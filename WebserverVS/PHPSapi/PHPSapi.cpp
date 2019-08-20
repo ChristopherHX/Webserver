@@ -177,7 +177,8 @@ void PHPSapi::init()
 		std::cout << "module nicht gestartet" << "\n";
 		return;
 	}
-	php_request_startup();
+	php_init_config();
+	// php_request_startup();
 #endif
 }
 
@@ -208,6 +209,7 @@ void PHPSapi::requesthandler(std::shared_ptr<Net::Http::V2::Session> session, st
 				std::cout << "module nicht gestartet" << "\n";
 				return;
 			}
+			php_init_config();
 		}
 		
 		//ts_free_id(resources - 1);

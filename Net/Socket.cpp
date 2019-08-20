@@ -24,12 +24,12 @@ Socket::~Socket() {
 	}
 }
 
-std::unique_lock<std::mutex> Socket::GetWriteLock() {
-	return std::unique_lock<std::mutex>(writelock);
+Socket::SocketOutputStream Socket::GetOutputStream() {
+	return Socket::SocketOutputStream(*this, std::unique_lock<std::mutex>(writelock));
 }
-
-std::unique_lock<std::mutex> Socket::GetReadLock() {
-	return std::unique_lock<std::mutex>(readlock);
+Socket::SocketInputStream Socket::GetInputStream() {
+	// return { *this, readlock };
+	return Socket::SocketInputStream(*this, std::unique_lock<std::mutex>(readlock));
 }
 
 SOCKET Socket::GetHandle() {
@@ -63,10 +63,14 @@ int Socket::Receive(uint8_t * buffer, int length) {
 	return recv(handle, (char*)buffer, length, 0);
 }
 
-bool Socket::ReceiveAll(uint8_t * buffer, int length) {
+int Socket::SocketInputStream::Receive(uint8_t * buffer, int length) {
+	return handle.Receive(buffer, length);
+}
+
+bool Socket::SocketInputStream::ReceiveAll(uint8_t * buffer, int length) {
 	uint8_t * end = buffer + length;
 	while (buffer < end) {
-		int received = Receive(buffer, end - buffer);
+		int received = handle.Receive(buffer, end - buffer);
 		if (received <= 0) {
 			return false;
 		}
@@ -79,23 +83,27 @@ int Socket::Send(const uint8_t * buffer, int length) {
 	return send(handle, (const char*)buffer, length, 0);
 }
 
-int Socket::Send(std::vector<uint8_t> buffer) {
-	return Send(buffer.data(), buffer.size());
+int Socket::SocketOutputStream::Send(const uint8_t * buffer, int length) {
+	return handle.Send(buffer, length);
 }
 
-int Net::Socket::Send(std::vector<uint8_t> buffer, int length) {
-	return Send(buffer.data(), length);
+int Socket::SocketOutputStream::Send(std::vector<uint8_t> buffer) {
+	return handle.Send(buffer.data(), buffer.size());
 }
 
-bool Socket::SendAll(const uint8_t * buffer, int length) {
-	return Send(buffer, length) == length;
+int Socket::SocketOutputStream::Send(std::vector<uint8_t> buffer, int length) {
+	return handle.Send(buffer.data(), length);
 }
 
-bool Socket::SendAll(std::vector<uint8_t> buffer) {
+bool Socket::SocketOutputStream::SendAll(const uint8_t * buffer, int length) {
+	return handle.Send(buffer, length) == length;
+}
+
+bool Socket::SocketOutputStream::SendAll(std::vector<uint8_t> buffer) {
 	return SendAll(buffer.data(), buffer.size());
 }
 
-bool Socket::SendAll(std::vector<uint8_t> buffer, int length) {
+bool Socket::SocketOutputStream::SendAll(std::vector<uint8_t> buffer, int length) {
 	return SendAll(buffer.data(), length);
 }
 

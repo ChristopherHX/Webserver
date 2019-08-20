@@ -30,25 +30,44 @@ namespace Net
 		std::string protocol;
 		std::mutex readlock;
 		std::mutex writelock;
+		virtual int Receive(uint8_t * buffer, int length);
+		virtual int Send(const uint8_t * buffer, int length);
 	public:
+		class SocketInputStream
+		{
+		private:
+			Socket & handle;
+			std::unique_lock<std::mutex> lock;
+		public:
+			SocketInputStream(Socket & handle, std::unique_lock<std::mutex> lock);
+			int Receive(uint8_t * buffer, int length);
+			bool ReceiveAll(uint8_t * buffer, int length);
+		};
+
+		class SocketOutputStream
+		{
+		private:
+			Socket & handle;
+			std::unique_lock<std::mutex> lock;
+		public:
+			SocketOutputStream(Socket & handle, std::unique_lock<std::mutex> lock);
+			int Send(const uint8_t * buffer, int length);
+			int Send(std::vector<uint8_t> buffer);
+			int Send(std::vector<uint8_t> buffer, int length);
+			bool SendAll(const uint8_t * buffer, int length);
+			bool SendAll(std::vector<uint8_t> buffer);
+			bool SendAll(std::vector<uint8_t> buffer, int length);
+		};
 		Socket(Socket && socket);
 		Socket(SOCKET socket, const std::shared_ptr<sockaddr> & socketaddress);
 		virtual ~Socket();
-		std::unique_lock<std::mutex> GetWriteLock();
-		std::unique_lock<std::mutex> GetReadLock();
+		SocketOutputStream GetOutputStream();
+		SocketInputStream GetInputStream();
 		SOCKET GetHandle();
 		std::string GetAddress();
 		uint16_t GetPort();
 		void SetProtocol(const std::string & protocol);
 		std::string GetProtocol();
-		virtual int Receive(uint8_t * buffer, int length);
-		bool ReceiveAll(uint8_t * buffer, int length);
-		virtual int Send(const uint8_t * buffer, int length);
-		int Send(std::vector<uint8_t> buffer);
-		int Send(std::vector<uint8_t> buffer, int length);
-		bool SendAll(const uint8_t * buffer, int length);
-		bool SendAll(std::vector<uint8_t> buffer);
-		bool SendAll(std::vector<uint8_t> buffer, int length);
 		virtual int SendTo(uint8_t * buffer, int length, const sockaddr * to, socklen_t tolength);
 		virtual int ReceiveFrom(uint8_t * buffer, int length, sockaddr * from, socklen_t * fromlength);
 	};

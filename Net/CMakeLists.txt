@@ -1,3 +1,9 @@
+# file(GLOB NET_SRC
+#     "*.cpp"
+# )
+# file(GLOB NET_HEADER
+#     "*.h"
+# )
 add_library(Net SHARED Socket.cpp SocketListener.cpp ../utility.cpp TLSSocket.cpp TLSSocketListener.cpp Http/Header.cpp Http/Request.cpp Http/Response.cpp Http/V1/Connection.cpp Http/V1/Http.cpp Http/V2/Connection.cpp Http/V2/Frame.cpp Http/V2/Session.cpp Http/V2/Stream.cpp Http/V2/HPack/HPack.cpp)
 if(WIN32)
 target_link_libraries (Net libssl libcrypto ws2_32.lib)

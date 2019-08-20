@@ -4,6 +4,13 @@
 
 using namespace Net::Http::V2;
 
+Request& Connection::GetRequest() {
+	return request;
+}
+Response& Connection::GetResponse() {
+	return response;
+}
+
 void Connection::SendResponse(bool endstream)
 {
 	std::vector<uint8_t> buffer(1 << 20);
@@ -14,8 +21,9 @@ void Connection::SendResponse(bool endstream)
 	result.type = Frame::Type::HEADERS;
 	result.flags = (Frame::Flag)((uint8_t)Frame::Flag::END_HEADERS | (endstream ? (uint8_t)Frame::Flag::END_STREAM : 0));
 	result.stream = frame.stream;
-	socket->SendAll(result.ToArray());
-	socket->SendAll(buffer.data(), result.length);
+	auto os = socket->GetOutputStream();
+	os.SendAll(result.ToArray());
+	os.SendAll(buffer.data(), result.length);
 }
 
 void Connection::SendData(const uint8_t* buffer, int length, bool endstream)
@@ -31,8 +39,9 @@ void Connection::SendData(const uint8_t* buffer, int length, bool endstream)
 			result.length = std::min(512, length - i);
 			if (endstream && result.length < 512)
 				result.flags = Frame::Flag::END_STREAM;
-			socket->SendAll(result.ToArray());
-			socket->SendAll(buffer + i, result.length);
+			auto os = socket->GetOutputStream();
+			os.SendAll(result.ToArray());
+			os.SendAll(buffer + i, result.length);
 		}
 	}
 	else
@@ -40,11 +49,12 @@ void Connection::SendData(const uint8_t* buffer, int length, bool endstream)
 		if(endstream)
 			result.flags = Frame::Flag::END_STREAM;
 		result.length = 0;
-		socket->SendAll(result.ToArray());
+		auto os = socket->GetOutputStream();
+		os.SendAll(result.ToArray());		
 	}
 }
 
-void Net::Http::Connection::SendData(std::vector<uint8_t>& buffer, int length, bool endstream)
-{
-	return SendData(buffer.data(), length, endstream);
-}
+// void Net::Http::Connection::SendData(std::vector<uint8_t>& buffer, int length, bool endstream)
+// {
+// 	return SendData(buffer.data(), length, endstream);
+// }

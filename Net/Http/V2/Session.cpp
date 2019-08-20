@@ -1,3 +1,4 @@
+#include "Stream.h"
 #include "Session.h"
 #include "Setting.h"
 #include "../Request.h"
@@ -19,7 +20,8 @@ static std::unordered_map<Frame::Type, std::function<void(std::shared_ptr<Sessio
 	auto end = beg + frame->length;	
 	if (frame->HasFlag(Frame::Flag::PRIORITY))
 	{
-		beg = Stream::Priority::Parse(beg, stream->priority);
+		beg = stream->ParsePriority(beg, *session);
+		// beg = Stream::Priority::Parse(beg, stream->priority);
 	}
 	if (frame->HasFlag(Frame::Flag::PADDED))
 	{
@@ -39,7 +41,8 @@ static std::unordered_map<Frame::Type, std::function<void(std::shared_ptr<Sessio
 } },{ Frame::Type::PRIORITY, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
 	if(frame->length != 5)
 		throw Error(Error::Type::Stream, Error::Code::FRAME_SIZE_ERROR);
-	Stream::Priority::Parse(buffer->cbegin(), frame->stream->priority);
+		frame->stream->ParsePriority(buffer->cbegin(), *session);
+	// Stream::Priority::Parse(buffer->cbegin(), frame->stream->priority);
 } },{ Frame::Type::RST_STREAM, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
 	if (frame->stream->identifier == 0)
 		throw Error(Error::Type::Connection, Error::Code::PROTOCOL_ERROR, "RST_STREAM frames MUST be associated with a stream");
@@ -61,7 +64,8 @@ static std::unordered_map<Frame::Type, std::function<void(std::shared_ptr<Sessio
 		while (pos != end)
 		{
 			Setting s = (Setting)(GetUInt16(pos) - 1);
-			session->GetSetting(s) = GetUInt32(pos);
+			session->settings[s] = GetUInt32(pos);
+			// session->GetSetting(s) = GetUInt32(pos);
 		}
 		{
 			Frame response;
@@ -125,12 +129,13 @@ void Net::Http::V2::Session::Start()
 		// frame.type = Frame::Type::SETTINGS;
 		// frame.length = 0;
 		// socket->SendAll(preface, sizeof(preface) - 1);
-		if (!socket->ReceiveAll(buffer.data(), sizeof(preface) - 1) || memcmp(buffer.data(), preface, sizeof(preface) - 1))
+		if (!socket->GetInputStream().ReceiveAll(buffer.data(), sizeof(preface) - 1) || memcmp(buffer.data(), preface, sizeof(preface) - 1))
 			throw std::runtime_error(u8"Invalid Connection Preface");
 	}
 	while (true)
 	{
-		if (!socket->ReceiveAll(buffer.data(), 9))
+		auto is = socket->GetInputStream();
+		if (!is.ReceiveAll(buffer.data(), 9))
 			throw Error(Error::Type::Connection, Error::Code::FRAME_SIZE_ERROR);
 		auto pos = buffer.cbegin();
 		auto frame = std::make_shared<Frame>();
@@ -163,10 +168,10 @@ void Net::Http::V2::Session::Start()
 			//frame->stream->ReceiveData(Frame)
 		}
 		else {
-			if (!socket->ReceiveAll(buffer.data(), frame->length))
+			if (!is.ReceiveAll(buffer.data(), frame->length))
 				throw Error(Error::Type::Connection, Error::Code::FRAME_SIZE_ERROR);
 
-			//framehandler.at(frame->type)(shared_from_this(),buffer, frame);
+			framehandler.at(frame->type)(shared_from_this(), std::make_shared<std::vector<uint8_t>>(buffer), frame);
 		}
 	}
 }
@@ -182,22 +187,24 @@ void Net::Http::V2::Session::SendFrame(std::shared_ptr<Stream> stream, const Fra
 	// 	if(!wait_fn())
 	// 		synccv.wait(lock, wait_fn);
 	// }
-	socket->SendAll(frame.ToArray());
+	auto os = socket->GetOutputStream();
+	os.SendAll(frame.ToArray());
 }
 
 void Net::Http::V2::Session::SendFrame(std::shared_ptr<Stream> stream, const Frame &frame, std::vector<uint8_t>::iterator & data)
 {
 	// if (stream->dependency)
 	// {
-	// 	std::unique_lock<std::mutex> lock(sync);		
+	// 	std::unique_lock<std::mutex> lock(sync);
 	// 	auto wait_fn = [stream = GetStream(stream->priority.dependency)]() -> bool {
 	// 		return stream->state == Stream::State::closed;
 	// 	};
 	// 	if(!wait_fn())
 	// 		synccv.wait(lock, wait_fn);
 	// }
-	socket->SendAll(frame.ToArray());
-	socket->SendAll(&*data, frame.length);
+	auto os = socket->GetOutputStream();
+	os.SendAll(frame.ToArray());
+	os.SendAll(&*data, frame.length);
 }
 
 void Net::Http::V2::Session::SendResponse(std::shared_ptr<Stream> stream, const Response & response, bool endstream)
@@ -229,9 +236,9 @@ void Net::Http::V2::Session::SendData(std::shared_ptr<Stream> stream, const uint
 		if (endstream && result.length == length)
 			result.flags = Frame::Flag::END_STREAM;
 		{
-			auto lock = socket->GetWriteLock();
-			socket->SendAll(result.ToArray());
-			socket->SendAll(buffer, result.length);
+			auto os = socket->GetOutputStream();
+			os.SendAll(result.ToArray());
+			os.SendAll(buffer, result.length);
 		}
 		length -= result.length;
 		buffer += result.length;

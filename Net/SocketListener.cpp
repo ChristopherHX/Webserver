@@ -20,10 +20,6 @@ SocketListener::SocketListener()
 SocketListener::~SocketListener()
 {
 	Cancel();
-	if (listener->joinable())
-	{
-		listener->join();
-	}
 	if (handle != -1)
 	{
 		shutdown(handle, 2);
@@ -52,19 +48,21 @@ std::shared_ptr<std::thread> Net::SocketListener::Listen(const std::shared_ptr<s
 	if (handle == -1)
 	{
 		if ((handle = socket(address->sa_family, SOCK_STREAM, 0)) == -1)
-			return listener = std::shared_ptr<std::thread>();
+			return listener = nullptr;
 		uint32_t value = 0;
 		setsockopt(handle, IPPROTO_IPV6, IPV6_V6ONLY, (const char*)&value, sizeof(value));
 		value = 1;
 		setsockopt(handle, IPPROTO_TCP, TCP_FASTOPEN, (const char*)&value, sizeof(value));
 		setsockopt(handle, SOL_SOCKET, SO_REUSEADDR, (const char*)&value, sizeof(value));
 	}
+	if (bind(handle, address.get(), addresslen) == -1)
 	{
-		if (bind(handle, address.get(), addresslen) == -1)
-			return std::shared_ptr<std::thread>();
+		return nullptr;
 	}
 	if (listen(handle, 10) == -1)
-		return std::shared_ptr<std::thread>();
+	{
+		return nullptr;
+	}
 	cancel = false;
 	return listener = std::make_shared<std::thread>([this]() {
 		while (!cancel)

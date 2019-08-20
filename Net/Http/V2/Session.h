@@ -46,9 +46,9 @@ namespace Net {
 				std::condition_variable synccv;
 				std::shared_ptr<HPack::Encoder> encoder = std::make_shared<HPack::Encoder>();
 				std::shared_ptr<HPack::Decoder> decoder = std::make_shared<HPack::Decoder>();
-				std::unordered_map<Setting,uint32_t> settings = { {Setting::HEADER_TABLE_SIZE, 4096}, {Setting::ENABLE_PUSH, 1}, { Setting::MAX_CONCURRENT_STREAMS, -1}, { Setting::INITIAL_WINDOW_SIZE, 0xffff}, { Setting::MAX_FRAME_SIZE, 0x2fff}, {Setting::MAX_HEADER_LIST_SIZE, 0x4000}};
 				std::vector<std::shared_ptr<Stream>> streams;
 			public:
+				std::unordered_map<Setting,uint32_t> settings = { {Setting::HEADER_TABLE_SIZE, 4096}, {Setting::ENABLE_PUSH, 1}, { Setting::MAX_CONCURRENT_STREAMS, -1}, { Setting::INITIAL_WINDOW_SIZE, 0xffff}, { Setting::MAX_FRAME_SIZE, 0x2fff}, {Setting::MAX_HEADER_LIST_SIZE, 0x4000}};
 				Session(std::shared_ptr<Net::Socket> &socket) : Net::Http::Session(socket) {
 
 				}

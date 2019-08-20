@@ -13,10 +13,10 @@ namespace Net
 		{
 		public:
 			std::shared_ptr<Net::Socket> socket;
-			Request request;
-			Response response;
+			virtual Request& GetRequest() = 0;
+			virtual Response& GetResponse() = 0;
 			virtual void SendResponse(bool endstream = false) = 0;
-			void SendData(std::vector<uint8_t> & buffer, int length, bool endstream = false);
+			virtual void SendData(std::vector<uint8_t> & buffer, int length, bool endstream = false) = 0;
 		};
 	}
 }

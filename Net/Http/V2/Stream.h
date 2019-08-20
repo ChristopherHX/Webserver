@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../Request.h"
-#include "Frame.h"
 #include "ErrorCode.h"
 #include <cstdint>
 #include <vector>
@@ -14,6 +13,8 @@ namespace Net
 	{
 		namespace V2
 		{
+			class Frame;
+			class Session;
 			class Stream : std::enable_shared_from_this<Stream>
 			{
 			private:
@@ -64,3 +65,5 @@ namespace Net
 		}
 	}
 }
+#include "Frame.h"
+#include "Session.h"
