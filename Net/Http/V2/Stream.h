@@ -47,8 +47,11 @@ namespace Net
 				uint32_t rwindowsize;
 				uint32_t hwindowsize;
 				void Reset(Error::Code code);
+				void SendFrame(std::shared_ptr<Stream> stream, const Frame & frame);
+				void SendFrame(std::shared_ptr<Stream> stream, const Frame & frame, std::vector<uint8_t>::iterator & data);
+				void SendResponse(std::shared_ptr<Stream> stream, const Net::Http::Response & response, bool endstream);
+				void SendData(std::shared_ptr<Stream> stream, const uint8_t* buffer, int length, bool endstream);
 				void ReceiveData(int length, bool endstream);
-				// void SendData(const uint8_t * buffer, int length, bool endstream);
 				template <class Iter>
 				Iter ParsePriority(Iter pos, const Session & session) {
 					exclusive = *pos & 0x80;

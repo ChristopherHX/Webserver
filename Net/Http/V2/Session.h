@@ -53,11 +53,7 @@ namespace Net {
 
 				}
 				void Start();
-				std::function<void(std::shared_ptr<Session>, std::shared_ptr<Stream>, std::shared_ptr<Net::Http::Request>)> requesthandler;				
-				void SendFrame(std::shared_ptr<Stream> stream, const Frame & frame);
-				void SendFrame(std::shared_ptr<Stream> stream, const Frame & frame, std::vector<uint8_t>::iterator & data);
-				void SendResponse(std::shared_ptr<Stream> stream, const Net::Http::Response & response, bool endstream);
-				void SendData(std::shared_ptr<Stream> stream, const uint8_t* buffer, int length, bool endstream);
+				std::function<void(std::shared_ptr<Session>, std::shared_ptr<Stream>, std::shared_ptr<Net::Http::Request>)> requesthandler;
 				std::shared_ptr<Stream> GetStream(uint32_t id);
 				std::shared_ptr<HPack::Decoder> GetDecoder()
 				{
