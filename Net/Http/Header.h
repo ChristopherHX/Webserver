@@ -4,6 +4,8 @@
 #include <math.h>
 #include <unordered_map>
 #include <memory>
+#include <vector>
+#include "HeaderImpl.h"
 
 namespace Net
 {
@@ -11,10 +13,10 @@ namespace Net
 	{
 		class Header
 		{
+		protected:
+			std::shared_ptr<HeaderImpl> headerimpl;
+			Header(const std::shared_ptr<HeaderImpl>& headerimpl);
 		public:
-			Header() : contentlength(0) {
-
-			}
 			static std::hash<std::string> hash_fn;
 			std::string scheme;
 			std::string authority;
@@ -23,8 +25,8 @@ namespace Net
 			std::unordered_multimap<std::string, std::string> headerlist;
 			void Add(const std::pair<std::string, std::string> & pair);
 			virtual bool Add(size_t hash, const std::pair<std::string, std::string> & pair);
-			virtual void EncodeHttp(std::vector<uint8_t>::iterator & buffer) const;
-			virtual void DecodeHttp(std::vector<uint8_t>::const_iterator & buffer, const std::vector<uint8_t>::const_iterator & end);
+			void Encode(std::vector<uint8_t>::iterator & buffer) const;
+			void Decode(std::vector<uint8_t>::const_iterator & buffer, const std::vector<uint8_t>::const_iterator & end);
 		};
 	}
 }

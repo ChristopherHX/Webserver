@@ -4,10 +4,10 @@
 
 using namespace Net::Http::V2;
 
-Request& Connection::GetRequest() {
+Net::Http::Request& Connection::GetRequest() {
 	return request;
 }
-Response& Connection::GetResponse() {
+Net::Http::Response& Connection::GetResponse() {
 	return response;
 }
 
@@ -15,7 +15,7 @@ void Connection::SendResponse(bool endstream)
 {
 	std::vector<uint8_t> buffer(1 << 20);
 	auto end = buffer.begin();
-	response.EncodeHttp2(encoder, end);
+	response.Encode(end);
 	Frame result;
 	result.length = end - buffer.begin();
 	result.type = Frame::Type::HEADERS;

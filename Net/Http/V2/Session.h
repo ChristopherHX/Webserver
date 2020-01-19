@@ -7,6 +7,8 @@
 #include <stack>
 #include <mutex>
 #include <vector>
+#include "HPack/Decoder.h"
+#include "HPack/Encoder.h"
 
 namespace Net {
 	namespace Http {
@@ -14,21 +16,21 @@ namespace Net {
 			template<class Iter>
 			Iter GetUInt16(Iter buffer, uint16_t & number)
 			{
-				number = buffer[0] << 8 | buffer[1];
+				number = *buffer << 8 | *(buffer + 1);
 				return buffer + 2;
 			}
 
 			template<class Iter>
 			Iter GetUInt24(Iter buffer, uint32_t & number)
 			{
-				number = buffer[0] << 16 | buffer[1] << 8 | buffer[2];
+				number = *buffer << 16 | *(buffer + 1) << 8 | *(buffer + 2);
 				return buffer + 3;
 			}
 
 			template<class Iter>
 			Iter GetUInt32(Iter buffer, uint32_t & number)
 			{
-				uint32_t number = (buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3];
+				number = (*buffer << 24) | (*(buffer + 1) << 16) | (*(buffer + 2) << 8) | *(buffer + 3);
 				return buffer + 4;
 			}
 
@@ -54,10 +56,14 @@ namespace Net {
 				}
 				void Start();
 				std::function<void(std::shared_ptr<Session>, std::shared_ptr<Stream>, std::shared_ptr<Net::Http::Request>)> requesthandler;
-				std::shared_ptr<Stream> GetStream(uint32_t id);
+				std::shared_ptr<Stream> GetStream(uint32_t id) const;
 				std::shared_ptr<HPack::Decoder> GetDecoder()
 				{
 					return decoder;
+				}
+				std::shared_ptr<HPack::Encoder> GetEncoder()
+				{
+					return encoder;
 				}
 			};
 		}

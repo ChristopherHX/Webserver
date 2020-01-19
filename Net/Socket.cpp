@@ -63,6 +63,10 @@ int Socket::Receive(uint8_t * buffer, int length) {
 	return recv(handle, (char*)buffer, length, 0);
 }
 
+Net::Socket::SocketInputStream::SocketInputStream(Net::Socket &handle, std::unique_lock<std::mutex> &&lock) : handle(handle), lock(std::move(lock)) {
+
+}
+
 int Socket::SocketInputStream::Receive(uint8_t * buffer, int length) {
 	return handle.Receive(buffer, length);
 }
@@ -81,6 +85,10 @@ bool Socket::SocketInputStream::ReceiveAll(uint8_t * buffer, int length) {
 
 int Socket::Send(const uint8_t * buffer, int length) {
 	return send(handle, (const char*)buffer, length, 0);
+}
+
+Net::Socket::SocketOutputStream::SocketOutputStream(Net::Socket &handle, std::unique_lock<std::mutex> &&lock) : handle(handle), lock(std::move(lock)) {
+	
 }
 
 int Socket::SocketOutputStream::Send(const uint8_t * buffer, int length) {

@@ -1,5 +1,4 @@
 #pragma once
-#include "V2/HPack/Encoder.h"
 #include "Header.h"
 #include <sstream>
 #include <string>
@@ -13,11 +12,9 @@ namespace Net
 		class Response : public Header
 		{
 		public:
+			Response(const std::shared_ptr<HeaderImpl>& headerimpl);
 			int status;
-			Response();
-			bool Add(size_t hash, const std::pair<std::string, std::string> & pair) override;
-			void EncodeHttp1(std::vector<uint8_t>::iterator & buffer) const override;
-			void EncodeHttp2(std::shared_ptr<Net::Http::V2::HPack::Encoder> encoder, std::vector<uint8_t>::iterator & buffer) const override;
+			virtual bool Add(size_t hash, const std::pair<std::string, std::string> & pair) override;
 		};
 	}
 }

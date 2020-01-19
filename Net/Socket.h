@@ -39,7 +39,7 @@ namespace Net
 			Socket & handle;
 			std::unique_lock<std::mutex> lock;
 		public:
-			SocketInputStream(Socket & handle, std::unique_lock<std::mutex> lock);
+			SocketInputStream(Socket & handle, std::unique_lock<std::mutex> && lock);
 			int Receive(uint8_t * buffer, int length);
 			bool ReceiveAll(uint8_t * buffer, int length);
 		};
@@ -50,7 +50,7 @@ namespace Net
 			Socket & handle;
 			std::unique_lock<std::mutex> lock;
 		public:
-			SocketOutputStream(Socket & handle, std::unique_lock<std::mutex> lock);
+			SocketOutputStream(Socket & handle, std::unique_lock<std::mutex> && lock);
 			int Send(const uint8_t * buffer, int length);
 			int Send(std::vector<uint8_t> buffer);
 			int Send(std::vector<uint8_t> buffer, int length);

@@ -16,7 +16,7 @@ namespace Net
 			virtual Request& GetRequest() = 0;
 			virtual Response& GetResponse() = 0;
 			virtual void SendResponse(bool endstream = false) = 0;
-			virtual void SendData(std::vector<uint8_t> & buffer, int length, bool endstream = false) = 0;
+			virtual void SendData(const uint8_t * buffer, int length, bool endstream = false) = 0;
 		};
 	}
 }

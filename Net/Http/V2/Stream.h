@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Request.h"
+#include "../Response.h"
 #include "ErrorCode.h"
 #include <cstdint>
 #include <vector>
@@ -18,6 +19,7 @@ namespace Net
 			class Stream : std::enable_shared_from_this<Stream>
 			{
 			private:
+				std::shared_ptr<Socket> socket;
 				std::function<void(std::vector<uint8_t>::const_iterator & buffer, uint32_t length)> _ondata;
 				std::function<void(Frame & frame, std::vector<uint8_t>::const_iterator & buffer, uint32_t length)> _oncontinuation;
 				std::condition_variable cond_var;
@@ -37,7 +39,7 @@ namespace Net
 					half_closed_remote = 0b01,
 					closed = 0b10000
 				};
-				Stream(uint32_t identifier, uint32_t initialwindowsize);
+				Stream(const std::shared_ptr<Socket> & socket, uint32_t identifier, uint32_t initialwindowsize);
 				uint32_t identifier;
 				State state;
 				std::shared_ptr<Stream> dependency;
@@ -47,26 +49,29 @@ namespace Net
 				uint32_t rwindowsize;
 				uint32_t hwindowsize;
 				void Reset(Error::Code code);
-				void SendFrame(std::shared_ptr<Stream> stream, const Frame & frame);
-				void SendFrame(std::shared_ptr<Stream> stream, const Frame & frame, std::vector<uint8_t>::iterator & data);
-				void SendResponse(std::shared_ptr<Stream> stream, const Net::Http::Response & response, bool endstream);
-				void SendData(std::shared_ptr<Stream> stream, const uint8_t* buffer, int length, bool endstream);
+				void SendFrame(const Frame & frame);
+				void SendFrame(const Frame & frame, std::vector<uint8_t>::iterator & data);
+				void SendResponse(const Net::Http::Response & response, bool endstream);
+				void SendData(const uint8_t* buffer, int length, bool endstream);
 				void ReceiveData(int length, bool endstream);
 				template <class Iter>
-				Iter ParsePriority(Iter pos, const Session & session) {
-					exclusive = *pos & 0x80;
-					uint32_t dependency;
-					pos = GetUInt31(pos, dependency);
-					this->dependency = session->GetStream(dependency);
-					if(exclusive) {
-						children = this->dependency->children;
-						this->dependency->children = {  };
-					}
-					weight = *pos++;
-				}
+				Iter ParsePriority(Iter pos, const Session & session);
 			};
 		}
 	}
 }
 #include "Frame.h"
 #include "Session.h"
+
+template<class Iter> Iter Net::Http::V2::Stream::ParsePriority(Iter pos, const Net::Http::V2::Session &session) {
+	exclusive = *pos & 0x80;
+	uint32_t dependency;
+	pos = GetUInt31(pos, dependency);
+	this->dependency = session.GetStream(dependency);
+	if(exclusive) {
+		children = this->dependency->children;
+		this->dependency->children = {  };
+	}
+	weight = *pos++;
+	return pos;
+}

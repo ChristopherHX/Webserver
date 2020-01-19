@@ -15,13 +15,12 @@ namespace Net
 		class Request : public Header
 		{
 		public:
+			Request(const std::shared_ptr<HeaderImpl>& headerimpl);
 			void ParseUri(const std::string &path);
 			std::string method;
 			std::string uri;
 			std::string path;
 			std::string query;
-			bool Add(size_t hash, const std::pair<std::string, std::string> & pair) override;
-			void DecodeHttp1(std::vector<uint8_t>::const_iterator & buffer, const std::vector<uint8_t>::const_iterator & end) override;
 		};
 	}
 }

@@ -6,7 +6,7 @@ void Connection::SendResponse(bool endstream)
 {
 	std::vector<uint8_t> buffer(1 << 20);
 	auto end = buffer.begin();
-	response.EncodeHttp1(end);
+	GetResponse().Encode(end);
 	auto os = socket->GetOutputStream();
 	os.SendAll(buffer.data(), end - buffer.begin());
 }

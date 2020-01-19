@@ -1,5 +1,4 @@
 #include "Http.h"
-#include "Http.h"
 
 std::string Net::Http::V1::KeyUpper(const std::string & source)
 {

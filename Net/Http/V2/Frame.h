@@ -3,9 +3,6 @@
 #include <vector>
 #include "Stream.h"
 
-uint16_t GetUInt16(std::vector<uint8_t>::const_iterator & buffer);
-uint32_t GetUInt31(std::vector<uint8_t>::const_iterator & buffer);
-uint32_t GetUInt32(std::vector<uint8_t>::const_iterator & buffer);
 void AddUInt31(uint32_t number, std::vector<uint8_t>::iterator & destination);
 void AddUInt32(uint32_t number, std::vector<uint8_t>::iterator & destination);
 

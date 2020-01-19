@@ -8,6 +8,7 @@
 #include "../Net/Http/V2/Connection.h"
 #include "../Net/Http/V1/Connection.h"
 #include "../Net/Http/V2/Session.h"
+#include "../Net/Http/V2/ResponseImpl.h"
 //#include "../PHPSapi/PHPSapi.h"
 
 #include <unordered_map>
@@ -17,10 +18,10 @@
 #include <fstream>
 #include <iostream>
 #include <cstdint>
-
-#include <experimental/filesystem>
+#include <cstring>
+#include <filesystem>
 using namespace Net::Http;
-using namespace std::experimental::filesystem;
+using namespace std::filesystem;
 
 //void RequestHandler(std::shared_ptr<Connection> connection)
 //{
@@ -95,26 +96,26 @@ int main(int argc, const char** argv)
 			try
 			{
 				auto session = std::make_shared<V2::Session>(socket);
-				session->requesthandler = [&sock, &cnd_var](std::shared_ptr<V2::Session> session, std::shared_ptr<Stream> stream, std::shared_ptr<Net::Http::Request> request)
+				session->requesthandler = [](std::shared_ptr<V2::Session> session, std::shared_ptr<Stream> stream, std::shared_ptr<Net::Http::Request> request)
                     {
                         std::vector<uint8_t> buffer;
 						if (request->method == "GET" && request->path == "/status.html")
 						{
-							Net::Http::Response response;
+							Net::Http::Response response(std::make_shared<V2::ResponseImpl>(session->GetDecoder(), session->GetEncoder()));
 							response.status = 200;
 							response.headerlist.insert({ "content-length", "23" });
-							session->SendResponse(stream, response, false);
-							session->SendData(stream, (uint8_t*)"Http/1-2 Server Running", 23, true);
+							stream->SendResponse(response, false);
+							stream->SendData((uint8_t*)"Http/1-2 Server Running", 23, true);
 						}
 						else
 						{
-							Net::Http::Response response;
+							Net::Http::Response response(std::make_shared<V2::ResponseImpl>(session->GetDecoder(), session->GetEncoder()));
 							response.status = 404;
 							response.contenttype = "text/plain";
 							std::string content = "Nicht gefunden";
 							response.contentlength = content.length();
-							session->SendResponse(stream, response, false);
-							session->SendData(stream, (const uint8_t*)content.data(), content.length(), true);
+							stream->SendResponse(response, false);
+							stream->SendData((const uint8_t*)content.data(), content.length(), true);
 						}
                     };
                     session->Start();
@@ -154,12 +155,12 @@ int main(int argc, const char** argv)
 		//	}
 		//}
 	});
-	listener.UsePrivateKey("D:\\Users\\administrator\\Documents\\privatekey.pem", Net::SSLFileType::PEM);
-	listener.UseCertificate("D:\\Users\\administrator\\Documents\\certificate.cer", Net::SSLFileType::PEM);
+	bool ret = listener.UsePrivateKey("server.key", Net::SSLFileType::PEM);
+	ret = listener.UseCertificate("server.cert", Net::SSLFileType::PEM);
 	auto address = std::make_shared<sockaddr_in6>();
 	memset(address.get(), 0, sizeof(sockaddr_in6));
 	address->sin6_family = AF_INET6;
-	address->sin6_port = htons(443);
+	address->sin6_port = htons(8443);
 	address->sin6_addr = in6addr_any;
 	listener.AddProtocol("h2");
 	//PHPSapi::init();

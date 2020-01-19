@@ -3,8 +3,10 @@
 #include <vector>
 #include <string_view>
 #include <sstream>
+#include <algorithm>
 #include "../ErrorCode.h"
 #include "../../Header.h"
+#include "HPack.h"
 
 namespace Net
 {

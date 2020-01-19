@@ -4,6 +4,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <iomanip>
+#include <cstring>
 
 namespace Utility {
 	std::string Replace(const std::string &str, const char * search, const char * replace)
