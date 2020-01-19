@@ -36,10 +36,10 @@ namespace Net
 		class SocketInputStream
 		{
 		private:
-			Socket & handle;
+			Socket* handle;
 			std::unique_lock<std::mutex> lock;
 		public:
-			SocketInputStream(Socket & handle, std::unique_lock<std::mutex> && lock);
+			SocketInputStream(Socket * handle, std::unique_lock<std::mutex> && lock);
 			int Receive(uint8_t * buffer, int length);
 			bool ReceiveAll(uint8_t * buffer, int length);
 		};

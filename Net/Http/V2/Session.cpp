@@ -135,7 +135,8 @@ void Net::Http::V2::Session::Start()
 		// frame.type = Frame::Type::SETTINGS;
 		// frame.length = 0;
 		// socket->SendAll(preface, sizeof(preface) - 1);
-		if (!socket->GetInputStream().ReceiveAll(buffer.data(), sizeof(preface) - 1) || memcmp(buffer.data(), preface, sizeof(preface) - 1))
+		auto in = socket->GetInputStream();
+		if (!in.ReceiveAll(buffer.data(), sizeof(preface) - 1) || memcmp(buffer.data(), preface, sizeof(preface) - 1))
 			throw std::runtime_error(u8"Invalid Connection Preface");
 	}
 	while (true)
@@ -145,12 +146,16 @@ void Net::Http::V2::Session::Start()
 			throw Error(Error::Type::Connection, Error::Code::FRAME_SIZE_ERROR);
 		auto pos = buffer.cbegin();
 		auto frame = std::make_shared<Frame>();
-		pos = GetUInt32(pos, frame->length);			
+		pos = GetUInt24(pos, frame->length);			
 		frame->type = (Frame::Type)*pos++;
 		frame->flags = (Frame::Flag)*pos++;
 		uint32_t streamid;
 		pos = GetUInt32(pos, streamid);
 		frame->stream = GetStream(streamid);
+		if(!frame->stream) {
+			frame->stream = std::make_shared<Stream>(socket, streamid, settings[Setting::INITIAL_WINDOW_SIZE]);
+			streams.emplace_back(frame->stream);
+		}
 		if (buffer.size() < frame->length)
 		{
 			if (frame->length > settings[Setting::MAX_FRAME_SIZE])

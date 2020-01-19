@@ -16,7 +16,7 @@ namespace Net
 		{
 			class Frame;
 			class Session;
-			class Stream : std::enable_shared_from_this<Stream>
+			class Stream : public std::enable_shared_from_this<Stream>
 			{
 			private:
 				std::shared_ptr<Socket> socket;

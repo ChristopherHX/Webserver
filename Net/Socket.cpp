@@ -29,7 +29,7 @@ Socket::SocketOutputStream Socket::GetOutputStream() {
 }
 Socket::SocketInputStream Socket::GetInputStream() {
 	// return { *this, readlock };
-	return Socket::SocketInputStream(*this, std::unique_lock<std::mutex>(readlock));
+	return Socket::SocketInputStream(this, std::unique_lock<std::mutex>(readlock));
 }
 
 SOCKET Socket::GetHandle() {
@@ -63,18 +63,18 @@ int Socket::Receive(uint8_t * buffer, int length) {
 	return recv(handle, (char*)buffer, length, 0);
 }
 
-Net::Socket::SocketInputStream::SocketInputStream(Net::Socket &handle, std::unique_lock<std::mutex> &&lock) : handle(handle), lock(std::move(lock)) {
+Net::Socket::SocketInputStream::SocketInputStream(Net::Socket *handle, std::unique_lock<std::mutex> &&lock) : handle(handle), lock(std::move(lock)) {
 
 }
 
 int Socket::SocketInputStream::Receive(uint8_t * buffer, int length) {
-	return handle.Receive(buffer, length);
+	return handle->Receive(buffer, length);
 }
 
 bool Socket::SocketInputStream::ReceiveAll(uint8_t * buffer, int length) {
 	uint8_t * end = buffer + length;
 	while (buffer < end) {
-		int received = handle.Receive(buffer, end - buffer);
+		int received = handle->Receive(buffer, end - buffer);
 		if (received <= 0) {
 			return false;
 		}
