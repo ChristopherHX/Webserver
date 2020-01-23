@@ -2,9 +2,11 @@
 
 #include "../Request.h"
 #include "../Response.h"
+#include "../../Socket.h"
 #include "ErrorCode.h"
 #include <cstdint>
 #include <vector>
+#include <memory>
 #include <functional>
 #include <condition_variable>
 
@@ -19,7 +21,7 @@ namespace Net
 			class Stream : public std::enable_shared_from_this<Stream>
 			{
 			private:
-				std::shared_ptr<Socket> socket;
+				std::shared_ptr<Net::Socket> socket;
 				std::function<void(std::vector<uint8_t>::const_iterator & buffer, uint32_t length)> _ondata;
 				std::function<void(Frame & frame, std::vector<uint8_t>::const_iterator & buffer, uint32_t length)> _oncontinuation;
 				std::condition_variable cond_var;

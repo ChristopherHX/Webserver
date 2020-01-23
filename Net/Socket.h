@@ -61,6 +61,7 @@ namespace Net
 		Socket(Socket && socket);
 		Socket(SOCKET socket, const std::shared_ptr<sockaddr> & socketaddress);
 		virtual ~Socket();
+		static std::shared_ptr<Socket> Connect(const std::string address, short port);
 		SocketOutputStream GetOutputStream();
 		SocketInputStream GetInputStream();
 		SOCKET GetHandle();

@@ -3,27 +3,14 @@
 
 using namespace Net;
 
-TLSSocket::TLSSocket(SSL_CTX * sslctx, intptr_t socket, const std::shared_ptr<sockaddr> &socketaddress) : Socket(socket, socketaddress)
+TLSSocket::TLSSocket(SSL * ssl, intptr_t socket, const std::shared_ptr<sockaddr> &socketaddress) : Socket(socket, socketaddress)
 {
-	ssl = SSL_new(sslctx);
-	SSL_set_fd(ssl, socket);
-	int ret = SSL_accept(ssl);
-	const unsigned char * alpn;
-	unsigned int len;
-	SSL_get0_alpn_selected(ssl, &alpn, &len);
-	protocol = std::string((const char*)alpn, len);
+	this->ssl = ssl;
 }
 
-TLSSocket::TLSSocket(SSL_CTX * sslctx, const std::shared_ptr<Socket> &socket) : Socket(std::move(*socket))
+TLSSocket::TLSSocket(SSL * ssl, const std::shared_ptr<Socket> &socket) : Socket(std::move(*socket))
 {
-	ssl = SSL_new(sslctx);
-	SSL_set_fd(ssl, socket->GetHandle());
-	int ret = SSL_accept(ssl);
-	ret = SSL_get_error(ssl, ret);
-	const unsigned char * alpn;
-	unsigned int len;
-	SSL_get0_alpn_selected(ssl, &alpn, &len);
-	protocol = std::string((const char*)alpn, len);
+	this->ssl = ssl;
 }
 
 TLSSocket::~TLSSocket()
@@ -31,6 +18,24 @@ TLSSocket::~TLSSocket()
 	SSL_shutdown(ssl);
 	SSL_free(ssl);
 }
+
+std::shared_ptr<Net::TLSSocket> TLSSocket::Connect(std::string address, short port, bool verify) {
+	std::shared_ptr<Net::Socket> sock = Socket::Connect(address, port);
+	SSL_CTX * ctx = SSL_CTX_new(TLSv1_2_client_method());
+	SSL * ssl = SSL_new(ctx);
+	SSL_CTX_free(ctx);
+	SSL_set_fd(ssl, sock->GetHandle());
+	if(!verify) {
+		SSL_set_verify(ssl, SSL_VERIFY_NONE, nullptr);
+	}
+	int ret = SSL_connect(ssl);
+	if(ret != 1) {
+		SSL_free(ssl);
+		return nullptr;
+	}
+	return std::make_shared<Net::TLSSocket>(ssl, sock);
+}
+
 
 int TLSSocket::Receive(uint8_t * buffer, int length)
 {

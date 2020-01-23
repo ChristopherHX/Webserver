@@ -8,7 +8,7 @@ ResponseImpl::ResponseImpl(const std::shared_ptr<HPack::Decoder> & decoder, cons
 }
 
 
-void ResponseImpl::Encode(const Header * header, std::vector<uint8_t>::iterator & buffer) const
+void ResponseImpl::Encode(const Net::Http::Header * header, std::vector<uint8_t>::iterator & buffer) const
 {
 	std::vector<std::pair<std::string, std::string>> headerlist = { { ":status", std::to_string(((Response*)header)->status) } };
 	encoder->AddHeaderBlock(buffer, headerlist);

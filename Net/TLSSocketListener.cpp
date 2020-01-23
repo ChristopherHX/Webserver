@@ -132,6 +132,15 @@ std::shared_ptr<Socket> TLSSocketListener::Accept()
 	SOCKET socket = accept(this->handle, (sockaddr*)address.get(), &size);
 	if (socket == -1)
 		return nullptr;
-	return std::make_shared<TLSSocket>(sslctx, socket, std::shared_ptr<sockaddr>(address, (sockaddr*)address.get()));
-	//return std::make_shared<TLSSocket>(sslctx, SocketListener::Accept());
+	this->sslctx = sslctx;
+	SSL* ssl = SSL_new(sslctx);
+	SSL_set_fd(ssl, socket);
+	int ret = SSL_accept(ssl);
+	ret = SSL_get_error(ssl, ret);
+	const unsigned char * alpn;
+	unsigned int len;
+	SSL_get0_alpn_selected(ssl, &alpn, &len);
+	auto tlssocket = std::make_shared<TLSSocket>(ssl, socket, std::shared_ptr<sockaddr>(address, (sockaddr*)address.get()));
+	tlssocket->SetProtocol(std::string((const char*)alpn, len));
+	return tlssocket;
 }

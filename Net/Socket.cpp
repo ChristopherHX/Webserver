@@ -5,6 +5,12 @@ using namespace Net;
 
 Socket::Socket(Socket && socket)
 {
+#ifdef _WIN32
+	{
+		WSADATA wsaData;
+		WSAStartup(MAKEWORD(2,2), &wsaData);
+	}
+#endif
 	handle = socket.handle;
 	socketaddress = socket.socketaddress;
 	socket.handle = -1;
@@ -12,6 +18,12 @@ Socket::Socket(Socket && socket)
 
 Socket::Socket(SOCKET handle, const std::shared_ptr<sockaddr> & socketaddress)
 {
+#ifdef _WIN32
+	{
+		WSADATA wsaData;
+		WSAStartup(MAKEWORD(2,2), &wsaData);
+	}
+#endif
 	this->handle = handle;
 	this->socketaddress = socketaddress;
 }
@@ -22,7 +34,45 @@ Socket::~Socket() {
 		closesocket(handle);
 		handle = -1;
 	}
+	WSACleanup();
 }
+
+std::shared_ptr<Socket> Socket::Connect(std::string address, short port) {
+#ifdef _WIN32
+	{
+		WSADATA wsaData;
+		WSAStartup(MAKEWORD(2,2), &wsaData);
+	}
+#endif
+ 	struct addrinfo hints, *result, *ptr;
+	memset(&hints, 0, sizeof(addrinfo));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+
+	if(getaddrinfo(address.data(), std::to_string(port).data(), &hints, &result) == 0) {
+		for(ptr=result; ptr != NULL ;ptr=ptr->ai_next) {
+			auto sock = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+			if(sock != -1) {
+				if(connect(sock, ptr->ai_addr, (int)ptr->ai_addrlen) != -1) {
+					auto socketaddress = std::shared_ptr<sockaddr>((sockaddr*)new char[ptr->ai_addrlen]);
+					freeaddrinfo(result);
+					auto psock = std::make_shared<Socket>(sock, socketaddress);
+#ifdef _WIN32
+					WSACleanup();
+#endif
+					return psock;
+				}
+			}
+		}
+		freeaddrinfo(result);
+	}
+#ifdef _WIN32
+	WSACleanup();
+#endif
+	return nullptr;
+}
+
 
 Socket::SocketOutputStream Socket::GetOutputStream() {
 	return Socket::SocketOutputStream(*this, std::unique_lock<std::mutex>(writelock));

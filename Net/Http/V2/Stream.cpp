@@ -3,7 +3,7 @@
 
 using namespace Net::Http::V2;
 
-Stream::Stream(const std::shared_ptr<Socket> & socket, uint32_t identifier, uint32_t initialwindowsize)
+Stream::Stream(const std::shared_ptr<Net::Socket> & socket, uint32_t identifier, uint32_t initialwindowsize)
 {
 	this->socket = socket;
 	this->identifier = identifier;
@@ -37,7 +37,7 @@ void Stream::SendFrame(const Frame &frame, std::vector<uint8_t>::iterator & data
 	os.SendAll(&*data, frame.length);
 }
 
-void Stream::SendResponse(const Response & response, bool endstream)
+void Stream::SendResponse(const Net::Http::Response & response, bool endstream)
 {
 	std::vector<uint8_t> buffer(1 << 20);
 	auto end = buffer.begin();
