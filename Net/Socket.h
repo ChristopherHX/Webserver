@@ -11,8 +11,10 @@
 #include <WS2tcpip.h>
 #undef NO_ERROR
 #else
+#include <sys/types.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <unistd.h>

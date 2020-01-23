@@ -34,7 +34,9 @@ Socket::~Socket() {
 		closesocket(handle);
 		handle = -1;
 	}
+#ifdef _WIN32
 	WSACleanup();
+#endif
 }
 
 std::shared_ptr<Socket> Socket::Connect(std::string address, short port) {
