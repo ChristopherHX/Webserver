@@ -4,10 +4,12 @@
 #include <string>
 #include <string_view>
 
-#if !defined(IMPORT) && defined(_WIN32)
+#ifndef IMPORT
+#ifdef _WIN32
 #define IMPORT  __declspec( dllimport )
 #else
 #define IMPORT
+#endif
 #endif
 
 namespace std {

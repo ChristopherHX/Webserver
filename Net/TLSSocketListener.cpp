@@ -71,11 +71,11 @@ bool TLSSocketListener::UseCertificate(const uint8_t * buffer, int length, SSLFi
 		BIO * bio = BIO_new_mem_buf(buffer, length);
 		X509 * key = PEM_read_bio_X509_AUX(bio, nullptr, nullptr, nullptr);
 		bool ret;
-		if (ret = key != nullptr)
+		if ((ret = key != nullptr))
 		{
-			if (ret = SSL_CTX_use_certificate(sslctx, key))
+			if ((ret = SSL_CTX_use_certificate(sslctx, key)))
 			{
-				if (ret = SSL_CTX_clear_chain_certs(sslctx))
+				if ((ret = SSL_CTX_clear_chain_certs(sslctx)))
 				{
 					{
 						X509 *ca;
@@ -132,7 +132,6 @@ std::shared_ptr<Socket> TLSSocketListener::Accept()
 	SOCKET socket = accept(this->handle, (sockaddr*)address.get(), &size);
 	if (socket == -1)
 		return nullptr;
-	this->sslctx = sslctx;
 	SSL* ssl = SSL_new(sslctx);
 	SSL_set_fd(ssl, socket);
 	int ret = SSL_accept(ssl);

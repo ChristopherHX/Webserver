@@ -21,7 +21,7 @@ TLSSocket::~TLSSocket()
 
 std::shared_ptr<Net::TLSSocket> TLSSocket::Connect(std::string address, short port, bool verify) {
 	std::shared_ptr<Net::Socket> sock = Socket::Connect(address, port);
-	SSL_CTX * ctx = SSL_CTX_new(TLSv1_2_client_method());
+	SSL_CTX * ctx = SSL_CTX_new(TLS_client_method());
 	SSL * ssl = SSL_new(ctx);
 	SSL_CTX_free(ctx);
 	SSL_set_fd(ssl, sock->GetHandle());

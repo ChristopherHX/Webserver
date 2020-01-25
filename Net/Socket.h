@@ -38,10 +38,10 @@ namespace Net
 		class SocketInputStream
 		{
 		private:
-			Socket* handle;
+			Socket& handle;
 			std::unique_lock<std::mutex> lock;
 		public:
-			SocketInputStream(Socket * handle, std::unique_lock<std::mutex> && lock);
+			SocketInputStream(Net::Socket &handle, std::unique_lock<std::mutex> && lock);
 			int Receive(uint8_t * buffer, int length);
 			bool ReceiveAll(uint8_t * buffer, int length);
 		};
@@ -53,12 +53,12 @@ namespace Net
 			std::unique_lock<std::mutex> lock;
 		public:
 			SocketOutputStream(Socket & handle, std::unique_lock<std::mutex> && lock);
-			int Send(const uint8_t * buffer, int length);
+			int Send(const uint8_t * buffer, size_t length);
 			int Send(std::vector<uint8_t> buffer);
-			int Send(std::vector<uint8_t> buffer, int length);
-			bool SendAll(const uint8_t * buffer, int length);
+			int Send(std::vector<uint8_t> buffer, size_t length);
+			bool SendAll(const uint8_t * buffer, size_t length);
 			bool SendAll(std::vector<uint8_t> buffer);
-			bool SendAll(std::vector<uint8_t> buffer, int length);
+			bool SendAll(std::vector<uint8_t> buffer, size_t length);
 		};
 		Socket(Socket && socket);
 		Socket(SOCKET socket, const std::shared_ptr<sockaddr> & socketaddress);
