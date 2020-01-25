@@ -50,7 +50,7 @@ namespace Net
 						while (true)
 						{
 							{
-								uint32_t count = std::min<uint32_t>(5, (end - pos));
+								uint32_t count = std::min<uint32_t>(5, (uint32_t)(end - pos));
 								std::reverse_copy(pos, pos + count, (buffer.data8) + (5 - count));
 							}
 							const std::pair<uint32_t, uint8_t> *res = std::find_if(StaticHuffmanTable, StaticHuffmanTable + 256, [buffer = (uint32_t)(buffer.data64 >> (8 - (i % 8)))](const std::pair<uint32_t, uint8_t> & entry) -> bool {

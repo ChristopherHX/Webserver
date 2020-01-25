@@ -17,7 +17,7 @@ void Connection::SendResponse(bool endstream)
 	auto end = buffer.begin();
 	response.Encode(end);
 	Frame result;
-	result.length = end - buffer.begin();
+	result.length = (uint32_t)(end - buffer.begin());
 	result.type = Frame::Type::HEADERS;
 	result.flags = (Frame::Flag)((uint8_t)Frame::Flag::END_HEADERS | (endstream ? (uint8_t)Frame::Flag::END_STREAM : 0));
 	result.stream = frame.stream;

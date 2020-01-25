@@ -16,7 +16,7 @@ namespace Net
 	{
 		namespace V2
 		{
-			class Frame;
+			struct Frame;
 			class Session;
 			class Stream : public std::enable_shared_from_this<Stream>
 			{

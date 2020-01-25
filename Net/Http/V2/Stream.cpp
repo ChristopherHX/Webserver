@@ -43,7 +43,7 @@ void Stream::SendResponse(const Net::Http::Response & response, bool endstream)
 	auto end = buffer.begin();
 	response.Encode(end);
 	Frame result;
-	result.length = end - buffer.begin();
+	result.length = (uint32_t)(end - buffer.begin());
 	result.type = Frame::Type::HEADERS;
 	result.flags = Frame::Flag::END_HEADERS;
 	if(endstream) 
