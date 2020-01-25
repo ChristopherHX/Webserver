@@ -119,11 +119,11 @@ Net::Socket::SocketInputStream::SocketInputStream(Net::Socket &handle, std::uniq
 
 }
 
-int Socket::SocketInputStream::Receive(uint8_t * buffer, int length) {
-	return handle.Receive(buffer, length);
+size_t Socket::SocketInputStream::Receive(uint8_t * buffer, size_t length) {
+	return handle.Receive(buffer, std::max((int)length, std::numeric_limits<int>::max()));
 }
 
-bool Socket::SocketInputStream::ReceiveAll(uint8_t * buffer, int length) {
+bool Socket::SocketInputStream::ReceiveAll(uint8_t * buffer, size_t length) {
 	uint8_t * end = buffer + length;
 	while (buffer < end) {
 		int received = handle.Receive(buffer, std::max((int)(end - buffer), std::numeric_limits<int>::max()));
@@ -143,10 +143,10 @@ Net::Socket::SocketOutputStream::SocketOutputStream(Net::Socket &handle, std::un
 	
 }
 
-int Socket::SocketOutputStream::Send(const uint8_t * buffer, size_t length) {
+size_t Socket::SocketOutputStream::Send(const uint8_t * buffer, size_t length) {
 	const uint8_t * end = buffer + length;
 	while (buffer < end) {
-		int sent = handle.Send(buffer, length);
+		int sent = handle.Send(buffer, std::max((int)(end - buffer), std::numeric_limits<int>::max()));
 		if (sent <= 0) {
 			return length - (end - buffer);
 		}
@@ -155,11 +155,11 @@ int Socket::SocketOutputStream::Send(const uint8_t * buffer, size_t length) {
 	return length;
 }
 
-int Socket::SocketOutputStream::Send(std::vector<uint8_t> buffer) {
+size_t Socket::SocketOutputStream::Send(std::vector<uint8_t> buffer) {
 	return Send(buffer.data(), buffer.size());
 }
 
-int Socket::SocketOutputStream::Send(std::vector<uint8_t> buffer, size_t length) {
+size_t Socket::SocketOutputStream::Send(std::vector<uint8_t> buffer, size_t length) {
 	return Send(buffer.data(), length);
 }
 
