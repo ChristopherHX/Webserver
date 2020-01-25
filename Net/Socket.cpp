@@ -126,7 +126,7 @@ size_t Socket::SocketInputStream::Receive(uint8_t * buffer, size_t length) {
 bool Socket::SocketInputStream::ReceiveAll(uint8_t * buffer, size_t length) {
 	uint8_t * end = buffer + length;
 	while (buffer < end) {
-		int received = handle.Receive(buffer, std::max((int)(end - buffer), std::numeric_limits<int>::max()));
+		int received = handle.Receive(buffer, (end - buffer) <= std::numeric_limits<int>::max() ? (int)(end - buffer) : std::numeric_limits<int>::max());
 		if (received <= 0) {
 			return false;
 		}
@@ -146,7 +146,7 @@ Net::Socket::SocketOutputStream::SocketOutputStream(Net::Socket &handle, std::un
 size_t Socket::SocketOutputStream::Send(const uint8_t * buffer, size_t length) {
 	const uint8_t * end = buffer + length;
 	while (buffer < end) {
-		int sent = handle.Send(buffer, std::max((int)(end - buffer), std::numeric_limits<int>::max()));
+		int sent = handle.Send(buffer, (end - buffer) <= std::numeric_limits<int>::max() ? (int)(end - buffer) : std::numeric_limits<int>::max());
 		if (sent <= 0) {
 			return length - (end - buffer);
 		}
