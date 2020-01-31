@@ -1,18 +1,19 @@
 #pragma once
 #include "../Session.h"
-#include "Frame.h"
-#include "Stream.h"
 #include "Setting.h"
+#include "../Request.h"
 #include "../Response.h"
 #include <stack>
 #include <mutex>
 #include <vector>
+#include <functional>
 #include "HPack/Decoder.h"
 #include "HPack/Encoder.h"
 
 namespace Net {
 	namespace Http {
 		namespace V2 {
+			class Stream;
 			template<class Iter>
 			Iter GetUInt16(Iter buffer, uint16_t & number)
 			{
@@ -69,3 +70,5 @@ namespace Net {
 		}
 	}
 }
+
+#include "Stream.h"

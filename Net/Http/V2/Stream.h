@@ -1,8 +1,8 @@
-#pragma once
+#ifndef NET_HTTPV2_STREAM_H1
+#define NET_HTTPV2_STREAM_H1
 
 #include "../Request.h"
 #include "../Response.h"
-#include "../../Socket.h"
 #include "ErrorCode.h"
 #include <cstdint>
 #include <vector>
@@ -12,6 +12,7 @@
 
 namespace Net
 {
+	class Socket;
 	namespace Http
 	{
 		namespace V2
@@ -62,6 +63,10 @@ namespace Net
 		}
 	}
 }
+#endif
+
+#ifndef NET_HTTPV2_STREAM_H2
+#define NET_HTTPV2_STREAM_H2
 #include "Frame.h"
 #include "Session.h"
 
@@ -77,3 +82,6 @@ template<class Iter> Iter Net::Http::V2::Stream::ParsePriority(Iter pos, const N
 	weight = *pos++;
 	return pos;
 }
+#endif
+
+#include "../../Socket.h"
