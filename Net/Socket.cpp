@@ -1,6 +1,7 @@
 #include "Socket.h"
 #include <stdexcept>
 #include <algorithm>
+#include <cstring>
 
 using namespace Net;
 
