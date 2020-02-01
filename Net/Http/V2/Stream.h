@@ -67,7 +67,7 @@ namespace Net
 
 #ifndef NET_HTTPV2_STREAM_H2
 #define NET_HTTPV2_STREAM_H2
-#include "Frame.h"
+#include "Support.h"
 #include "Session.h"
 
 template<class Iter> Iter Net::Http::V2::Stream::ParsePriority(Iter pos, const Net::Http::V2::Session &session) {
@@ -85,3 +85,4 @@ template<class Iter> Iter Net::Http::V2::Stream::ParsePriority(Iter pos, const N
 #endif
 
 #include "../../Socket.h"
+#include "Frame.h"
