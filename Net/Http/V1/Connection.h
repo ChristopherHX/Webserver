@@ -9,9 +9,15 @@ namespace Net
         {
             class Connection : public Net::Http::Connection
             {
+                Request request;
+				Response response;
+                std::shared_ptr<Socket> socket;
             public:
-                void SendResponse(bool endstream = false) override;
-                void SendData(const uint8_t * buffer, int length, bool endstream = false) override;
+                Connection(const std::shared_ptr<Socket>& socket);
+                virtual Request& GetRequest() override;
+				virtual Response& GetResponse() override;
+                virtual void SendResponse(bool endstream = false) override;
+                virtual void SendData(const uint8_t * buffer, int length, bool endstream = false) override;
             };
         }
     }

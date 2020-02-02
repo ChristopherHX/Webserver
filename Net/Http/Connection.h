@@ -12,7 +12,7 @@ namespace Net
 		class Connection
 		{
 		public:
-			std::shared_ptr<Net::Socket> socket;
+			virtual ~Connection() {} 
 			virtual Request& GetRequest() = 0;
 			virtual Response& GetResponse() = 0;
 			virtual void SendResponse(bool endstream = false) = 0;

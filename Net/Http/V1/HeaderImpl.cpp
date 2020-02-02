@@ -10,7 +10,7 @@ void Net::Http::V1::HeaderImpl::Encode(const Header* header, std::vector<uint8_t
 		buffer = std::copy(line.begin(), line.end(), buffer);
 	}
 	const char nl[] = "\r\n";
-	buffer = std::copy(nl, std::end(nl), buffer);
+	buffer = std::copy(nl, std::end(nl) - 1, buffer);
 }
 
 void Net::Http::V1::HeaderImpl::Decode(Header* header, std::vector<uint8_t>::const_iterator &buffer, const std::vector<uint8_t>::const_iterator &end) {
