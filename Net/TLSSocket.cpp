@@ -21,14 +21,15 @@ TLSSocket::~TLSSocket()
 
 std::shared_ptr<Net::TLSSocket> TLSSocket::Connect(std::string address, short port, bool verify) {
 	std::shared_ptr<Net::Socket> sock = Socket::Connect(address, port);
+	if(!sock) return nullptr;
 	SSL_CTX * ctx = SSL_CTX_new(TLS_client_method());
 	SSL * ssl = SSL_new(ctx);
 	SSL_CTX_free(ctx);
-	SSL_set_fd(ssl, sock->GetHandle());
+	int ret = SSL_set_fd(ssl, sock->GetHandle());
 	if(!verify) {
 		SSL_set_verify(ssl, SSL_VERIFY_NONE, nullptr);
 	}
-	int ret = SSL_connect(ssl);
+	ret = SSL_connect(ssl);
 	if(ret != 1) {
 		SSL_free(ssl);
 		return nullptr;
