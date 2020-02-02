@@ -12,10 +12,9 @@ namespace Net
 			{
 				Request request;
 				Response response;
-			public:
-				std::shared_ptr<HPack::Encoder> encoder;
-				Frame frame;
 				std::shared_ptr<Stream> stream;
+			public:
+				Connection(const std::shared_ptr<Stream>& stream, const std::shared_ptr<HPack::Decoder> &decoder, const std::shared_ptr<HPack::Encoder> &encoder);
 				virtual Request& GetRequest() override;
 				virtual Response& GetResponse() override;
 				virtual void SendResponse(bool endstream = false) override;

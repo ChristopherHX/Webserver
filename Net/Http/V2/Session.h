@@ -2,7 +2,8 @@
 #include "../Session.h"
 #include "Setting.h"
 #include "../Request.h"
-#include "../Response.h"
+#include "../Request.h"
+#include "../Connection.h"
 #include <stack>
 #include <mutex>
 #include <vector>
@@ -27,7 +28,7 @@ namespace Net {
 
 				}
 				void Start();
-				std::function<void(std::shared_ptr<Session>, std::shared_ptr<Stream>, std::shared_ptr<Net::Http::Request>)> requesthandler;
+				std::function<void(std::shared_ptr<Net::Http::Connection>)> requesthandler;
 				std::shared_ptr<Stream> GetStream(uint32_t id) const;
 				std::shared_ptr<HPack::Decoder> GetDecoder()
 				{

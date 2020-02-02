@@ -1,6 +1,7 @@
 #include "Stream.h"
 #include "Session.h"
 #include "Setting.h"
+#include "Connection.h"
 #include "../Request.h"
 #include "../Response.h"
 #include <fstream>
@@ -34,11 +35,11 @@ static std::unordered_map<Frame::Type, std::function<void(std::shared_ptr<Sessio
 		if((end - beg) < padlength)
 			throw Error(Error::Type::Connection, Error::Code::PROTOCOL_ERROR, "Padding exceeds the size remaining for the header block");
 	}
-	std::shared_ptr<Net::Http::Request> request = std::make_shared<Net::Http::Request>(std::make_shared<Net::Http::V2::RequestImpl>(session->GetDecoder(), session->GetEncoder()));
-	request->Decode(beg, end);
+	auto con = std::make_shared<Connection>(stream, session->GetDecoder(), session->GetEncoder());
+	con->GetRequest().Decode(beg, end);
 	if (frame->HasFlag(Frame::Flag::END_HEADERS))
 	{
-		session->requesthandler(session, stream, request);
+		session->requesthandler(con);
 	}
 } },{ Frame::Type::PRIORITY, [](std::shared_ptr<Session> session, std::shared_ptr<std::vector<uint8_t>> buffer, std::shared_ptr<Frame> frame) {
 	if(frame->length != 5)
