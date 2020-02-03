@@ -121,7 +121,7 @@ Net::Socket::SocketInputStream::SocketInputStream(Net::Socket &handle, std::uniq
 }
 
 size_t Socket::SocketInputStream::Receive(uint8_t * buffer, size_t length) {
-	return handle.Receive(buffer, std::max((int)length, std::numeric_limits<int>::max()));
+	return handle.Receive(buffer, length <= std::numeric_limits<int>::max() ? (int)length : std::numeric_limits<int>::max());
 }
 
 bool Socket::SocketInputStream::ReceiveAll(uint8_t * buffer, size_t length) {
