@@ -20,12 +20,6 @@ SocketListener::SocketListener()
 SocketListener::~SocketListener()
 {
 	Cancel();
-	if (handle != -1)
-	{
-		shutdown(handle, 2);
-		closesocket(handle);
-		handle = -1;
-	}
 #ifdef _WIN32
 	WSACleanup();
 #endif // _WIN32
@@ -77,6 +71,12 @@ std::shared_ptr<std::thread> Net::SocketListener::Listen(const std::shared_ptr<s
 void SocketListener::Cancel()
 {
 	cancel = true;
+	if (handle != -1)
+	{
+		shutdown(handle, 2);
+		closesocket(handle);
+		handle = -1;
+	}
 	if (listener && listener->joinable())
 		listener->join();
 }
